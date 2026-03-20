@@ -1,5 +1,6 @@
 import { Bell, Search, Moon, Sun, ChevronDown, User, LogOut, Settings } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,21 +11,48 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 const AppHeader = () => {
-  const [isDark, setIsDark] = useState(true);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
-  const toggleTheme = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle("light");
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem("theme");
+    return saved ? saved === "dark" : true;
+  });
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.remove("light");
+      localStorage.setItem("theme", "dark");
+    } else {
+      document.documentElement.classList.add("light");
+      localStorage.setItem("theme", "light");
+    }
+  }, [isDark]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
   };
+
+  const displayName =
+    user?.user_metadata?.full_name ||
+    user?.email?.split("@")[0] ||
+    "Usuário";
+
+  const initials = displayName
+    .split(" ")
+    .slice(0, 2)
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase();
 
   return (
     <header className="h-14 flex items-center gap-3 px-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-30">
-      {/* Trigger de sidebar */}
       <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors" />
 
-      {/* Barra de busca global */}
       <button
         className={cn(
           "flex-1 max-w-sm flex items-center gap-2 px-3 py-1.5 rounded-lg",
@@ -32,7 +60,6 @@ const AppHeader = () => {
           "hover:border-primary/40 hover:text-foreground transition-all duration-200",
           "cursor-pointer"
         )}
-        onClick={() => {/* TODO: abrir busca global cmd+K */}}
         aria-label="Busca global (Ctrl+K)"
       >
         <Search className="w-3.5 h-3.5 flex-shrink-0" />
@@ -41,18 +68,16 @@ const AppHeader = () => {
       </button>
 
       <div className="flex items-center gap-1 ml-auto">
-        {/* Toggle de tema */}
         <Button
           variant="ghost"
           size="icon"
           className="h-8 w-8 text-muted-foreground hover:text-foreground"
-          onClick={toggleTheme}
+          onClick={() => setIsDark(!isDark)}
           aria-label="Alternar tema"
         >
           {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </Button>
 
-        {/* Notificações */}
         <Button
           variant="ghost"
           size="icon"
@@ -63,7 +88,6 @@ const AppHeader = () => {
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
         </Button>
 
-        {/* Avatar + menu de usuário */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -75,23 +99,36 @@ const AppHeader = () => {
               aria-label="Menu do usuário"
             >
               <div className="w-7 h-7 rounded-full bg-gradient-primary flex items-center justify-center flex-shrink-0">
-                <User className="w-3.5 h-3.5 text-primary-foreground" />
+                {initials ? (
+                  <span className="text-2xs font-bold text-primary-foreground">{initials}</span>
+                ) : (
+                  <User className="w-3.5 h-3.5 text-primary-foreground" />
+                )}
               </div>
-              <span className="text-xs font-medium text-foreground hidden sm:block">Usuário</span>
+              <span className="text-xs font-medium text-foreground hidden sm:block max-w-[120px] truncate">
+                {displayName}
+              </span>
               <ChevronDown className="w-3 h-3 text-muted-foreground hidden sm:block" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem>
+            <div className="px-2 py-1.5 border-b border-border mb-1">
+              <p className="text-xs font-medium text-foreground truncate">{displayName}</p>
+              <p className="text-2xs text-muted-foreground truncate">{user?.email}</p>
+            </div>
+            <DropdownMenuItem onClick={() => navigate("/app/configuracoes")}>
               <User className="w-4 h-4 mr-2" />
               Perfil
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/app/configuracoes")}>
               <Settings className="w-4 h-4 mr-2" />
               Configurações
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={handleSignOut}
+            >
               <LogOut className="w-4 h-4 mr-2" />
               Sair
             </DropdownMenuItem>

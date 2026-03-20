@@ -19,7 +19,13 @@ const LoginPage = () => {
 
     const { error } = await signIn(email, password);
     if (error) {
-      setError("E-mail ou senha inválidos. Verifique e tente novamente.");
+      if (error.toLowerCase().includes("email not confirmed")) {
+        setError("E-mail não confirmado. Verifique sua caixa de entrada e clique no link de confirmação.");
+      } else if (error.toLowerCase().includes("invalid login credentials") || error.toLowerCase().includes("invalid credentials")) {
+        setError("E-mail ou senha inválidos. Verifique e tente novamente.");
+      } else {
+        setError(error);
+      }
     } else {
       navigate("/app");
     }

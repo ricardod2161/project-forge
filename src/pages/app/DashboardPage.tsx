@@ -2,21 +2,35 @@ import { motion } from "framer-motion";
 import { FolderOpen, Plus, Zap, BarChart3, TrendingUp, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
-
-const metrics = [
-  { label: "Total de Projetos", value: "0", icon: FolderOpen, delta: null },
-  { label: "Projetos Ativos", value: "0", icon: TrendingUp, delta: null },
-  { label: "Prompts Gerados", value: "0", icon: Zap, delta: null },
-  { label: "Score Médio", value: "—", icon: BarChart3, delta: null },
-];
+import { useAuth } from "@/hooks/useAuth";
 
 const DashboardPage = () => {
+  const { user } = useAuth();
+
+  const displayName =
+    user?.user_metadata?.full_name ||
+    user?.email?.split("@")[0] ||
+    "usuário";
+
+  const firstName = displayName.split(" ")[0];
+
+  const metrics = [
+    { label: "Total de Projetos", value: "0", icon: FolderOpen, delta: null },
+    { label: "Projetos Ativos", value: "0", icon: TrendingUp, delta: null },
+    { label: "Prompts Gerados", value: "0", icon: Zap, delta: null },
+    { label: "Score Médio", value: "—", icon: BarChart3, delta: null },
+  ];
+
   return (
     <div className="space-y-8">
       {/* Cabeçalho */}
       <div>
-        <h1 className="font-display font-bold text-xl text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground text-xs mt-1">Bem-vindo ao Arquiteto IA</p>
+        <h1 className="font-display font-bold text-xl text-foreground">
+          Olá, {firstName} 👋
+        </h1>
+        <p className="text-muted-foreground text-xs mt-1">
+          Bem-vindo ao Arquiteto IA — seu espaço de criação técnica
+        </p>
       </div>
 
       {/* Métricas */}

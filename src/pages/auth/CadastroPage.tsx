@@ -29,6 +29,8 @@ const CadastroPage = () => {
     if (error) {
       if (error.toLowerCase().includes("already registered")) {
         setError("Este e-mail já está cadastrado. Tente fazer login.");
+      } else if (error.toLowerCase().includes("email not confirmed")) {
+        setError("Confirme seu e-mail antes de continuar. Verifique sua caixa de entrada.");
       } else {
         setError(error);
       }
@@ -36,8 +38,7 @@ const CadastroPage = () => {
     } else {
       setSuccess(true);
       setIsLoading(false);
-      // Auto-redirect após cadastro (email confirmado automaticamente)
-      setTimeout(() => navigate("/app"), 1500);
+      navigate("/app");
     }
   };
 
