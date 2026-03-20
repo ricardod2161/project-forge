@@ -1,127 +1,117 @@
 
-## Plano — Etapa 3: Banco de Dados + Dashboard com dados reais + Wizard completo
+## Auditoria Completa + Plano de Produção — Arquiteto IA
 
-### O que existe hoje
-- Apenas tabela `profiles` no banco
-- `DashboardPage` com métricas hardcoded (zeros)
-- `NewProjectPage` com apenas Etapa 1 estática, sem state management e sem salvar
-- `ProjectsPage` sem listagem real
-- `ProjectCard` com interface tipada mas sem dados
+### Estado atual do sistema (diagnóstico honesto)
 
----
+**O que funciona:**
+- Auth (login/cadastro) operando com Supabase — confirmado pelas network requests
+- Wizard cria projetos e salva no banco (HTTP 201 confirmado nos logs)
+- Dashboard carrega métricas reais
+- ProjectsPage com busca/filtros funcional
+- Design system visual consistente
 
-### 1. Migração do Banco de Dados
+**O que está quebrado ou incompleto (8 problemas críticos):**
 
-Criar uma migration SQL com as 5 tabelas solicitadas + triggers:
+1. **`ProjectDetailPage`** — Exibe apenas `Projeto #ID` hardcoded. Não carrega dados do Supabase. Abas são decorativas sem conteúdo. Prioridade máxima.
 
-**`projects`**
-```sql
-id, user_id, title, slug, description, original_idea, type, niche,
-status (draft/active/archived), quality_score, is_favorite, metadata (jsonb),
-created_at, updated_at
-```
-RLS: SELECT/INSERT/UPDATE/DELETE filtrado por `auth.uid() = user_id`
+2. **`PromptsPage`** — Placeholder total. Mensagem "disponível após Etapa 5". Precisa mostrar todos os prompts do usuário por projeto.
 
-**`prompts`**
-```sql
-id, project_id, user_id, type, title, content, platform, version,
-tokens_estimate, created_at, updated_at
-```
-RLS: via `user_id`
+3. **`TemplatesPage`** — Placeholder. Precisa carregar da tabela `templates` (existe no banco).
 
-**`project_versions`**
-```sql
-id, project_id, version_number, snapshot (jsonb), changes_summary,
-generated_by_ai, ai_observations, created_at, updated_at
-```
-RLS: join com projects para verificar user_id
+4. **`VersionsPage`** — Placeholder. Precisa listar versões da tabela `project_versions`.
 
-**`templates`**
-```sql
-id, niche, title, description, preview_image, content (jsonb),
-is_featured, usage_count, created_at, updated_at
-```
-RLS: SELECT público (templates são compartilhados)
+5. **`EvaluationsPage`** — Placeholder. Precisa listar projetos com scores.
 
-**`activity_logs`**
-```sql
-id, user_id, project_id, action, entity_type, entity_id, metadata (jsonb), created_at
-```
-RLS: por `user_id`
+6. **`SettingsPage`** — Cards decorativos sem ação. Perfil não edita nem salva.
 
-Triggers `updated_at` em todas as tabelas que têm esse campo.
+7. **`ExportsPage`** — Placeholder total.
+
+8. **`ProjectCard`** — Botão "Opções" (MoreHorizontal) não tem menu dropdown. Favoritar não chama API.
+
+**Triggers ausentes no banco:** As funções `update_updated_at_column` existem mas sem triggers registrados — o campo `updated_at` não está sendo atualizado automaticamente.
 
 ---
 
-### 2. Hook `useProjects`
+### O que será implementado
 
-Criar `src/hooks/useProjects.ts` com React Query:
-- `useProjectMetrics()` — queries para `count(*)` de projects e prompts por usuário
-- `useRecentProjects()` — 6 projetos mais recentes ordenados por `updated_at`
-- `useCreateProject()` — mutation para inserir na tabela `projects`
+**1. Migration — triggers `updated_at` em todas as tabelas**
+- Criar trigger `update_updated_at` para `projects`, `prompts`, `project_versions`, `templates`, `profiles`
+
+**2. `ProjectDetailPage` — completamente reescrita**
+- Carrega dados reais via `useQuery` na tabela `projects` por `id`
+- Header com título real, status real, score ring animado
+- Abas com state local (`activeTab`)
+- **Aba "Visão Geral"**: exibe todos os campos do projeto (ideia, tipo, nicho, público, features, integrações, monetização)
+- **Aba "Ideia Original"**: textarea com texto bruto preservado
+- **Aba "Prompts"**: lista prompts do projeto com botão copiar
+- **Demais abas**: empty state elegante com CTA contextual (não "disponível na Etapa X")
+- Botão Favoritar funcional (chama `useToggleFavorite`)
+- Botão "Editar status" dropdown
+
+**3. `PromptsPage` — funcional**
+- Lista todos os prompts do usuário agrupados por projeto
+- Busca textual
+- Botão copiar com feedback visual ("Copiado!" 2s)
+- Empty state: "Crie um projeto e gere seus primeiros prompts"
+
+**4. `TemplatesPage` — funcional com dados reais**
+- Carrega da tabela `templates` via React Query
+- Filtros por nicho (chips)
+- Cards por template com título, descrição, nicho badge
+- Empty state enquanto não há templates seed
+- Seed: inserir 6 templates iniciais na migration
+
+**5. `VersionsPage` — funcional**
+- Lista versões agrupadas por projeto via React Query
+- Exibe `version_number`, `changes_summary`, `created_at`
+- Empty state contextual
+
+**6. `EvaluationsPage` — funcional**
+- Lista projetos com `quality_score` não nulo
+- Score ring (componente já existe) para cada projeto
+- Projetos sem score: empty state "Execute uma avaliação no projeto"
+
+**7. `SettingsPage` — funcional com persistência**
+- Seção "Perfil": input nome + email read-only + botão salvar → UPDATE na tabela `profiles`
+- Seção "Aparência": toggle dark/light (já funciona no header, replicar aqui)
+- Seção "Plano": carrega `plan` da tabela `profiles`
+- Demais seções: UI polida mas sem funcionalidade back-end ainda (scope claro)
+
+**8. `ExportsPage` — funcional com exportação real**
+- Carrega projetos do usuário
+- Seleciona projeto → exporta documentação técnica em texto estruturado
+- Botão "Copiar tudo" e "Baixar .txt"
+- Conteúdo gerado client-side a partir dos dados do projeto (sem Edge Function necessária)
+
+**9. `ProjectCard` — dropdown de ações**
+- Menu dropdown no botão MoreHorizontal: Favoritar/Desfavoritar, Arquivar, Ver detalhes
+- Favoritar chama `useToggleFavorite`
+
+**10. Hook `useProjectDetail` — novo hook**
+- `useProjectDetail(id)` → query `projects` por id + query `prompts` por project_id
+- Tipos corretos (sem `any`)
 
 ---
 
-### 3. Dashboard com dados reais
-
-**`DashboardPage.tsx`** refatorado:
-- Métricas via `useProjectMetrics()` com skeleton loader durante loading
-- Seção "Projetos Recentes" com grid de `ProjectCard` (máx 6)
-- Estado vazio (sem projetos): ilustração + CTA — mostrado condicionalmente
-- Números animados com `framer-motion` count-up
-
----
-
-### 4. Wizard de Criação de Projeto (4 etapas completas)
-
-**Hook `src/hooks/useProjectWizard.ts`** com Zustand:
-```ts
-interface WizardState {
-  currentStep: number        // 0-3
-  idea: string               // etapa 1
-  type: string               // etapa 2
-  niche: string              // etapa 2
-  complexity: number         // etapa 2
-  platform: string           // etapa 2
-  audience: string           // etapa 3
-  features: string[]         // etapa 3
-  monetization: string       // etapa 3
-  integrations: string[]     // etapa 3
-  isSubmitting: boolean
-}
-```
-Auto-save no `localStorage` via middleware Zustand `persist`.
-
-**`NewProjectPage.tsx`** completamente reescrito com as 4 etapas:
-
-- **Etapa 1 — Ideia**: textarea grande, contador de chars, botões Próximo/Voltar
-- **Etapa 2 — Classificação**: cards clicáveis para tipo (SaaS/App/ERP/etc), grid de chips para nicho, slider de complexidade (1-5), chips de plataforma alvo
-- **Etapa 3 — Detalhamento**: público-alvo (textarea), funcionalidades (input + chips removíveis), modelo de monetização (radio cards), integrações (chips)
-- **Etapa 4 — Confirmação**: preview de todas as escolhas + botão "Criar Projeto" com loading state
-
-Ao confirmar: insert na tabela `projects` via `useCreateProject()` → redireciona para `/app/projetos/:id`.
-
-**`ProjectsPage.tsx`** atualizada para listar projetos reais com skeleton + empty state.
-
----
-
-### Arquivos criados/modificados
+### Arquivos a criar/modificar
 
 | Arquivo | Ação |
 |---|---|
-| `supabase/migrations/[timestamp]_core_tables.sql` | Criar — 5 tabelas + RLS + triggers |
-| `src/hooks/useProjects.ts` | Criar — React Query hooks |
-| `src/hooks/useProjectWizard.ts` | Criar — Zustand store do wizard |
-| `src/pages/app/DashboardPage.tsx` | Reescrever — métricas reais + projetos recentes |
-| `src/pages/app/NewProjectPage.tsx` | Reescrever — wizard 4 etapas funcional |
-| `src/pages/app/ProjectsPage.tsx` | Reescrever — listagem real com skeleton |
-
----
+| `supabase/migrations/[ts]_triggers.sql` | Criar — triggers updated_at + seed templates |
+| `src/hooks/useProjectDetail.ts` | Criar — hook para detalhes do projeto |
+| `src/pages/app/ProjectDetailPage.tsx` | Reescrever — real e funcional |
+| `src/pages/app/PromptsPage.tsx` | Reescrever — lista real de prompts |
+| `src/pages/app/TemplatesPage.tsx` | Reescrever — templates do banco |
+| `src/pages/app/VersionsPage.tsx` | Reescrever — versões reais |
+| `src/pages/app/EvaluationsPage.tsx` | Reescrever — scores reais |
+| `src/pages/app/SettingsPage.tsx` | Reescrever — perfil editável |
+| `src/pages/app/ExportsPage.tsx` | Reescrever — exportação funcional |
+| `src/components/ProjectCard.tsx` | Editar — dropdown de ações |
 
 ### Ordem de execução
-1. Migração do banco (5 tabelas)
-2. Hook `useProjects`
-3. Hook `useProjectWizard`
-4. Dashboard atualizado
-5. Wizard completo
-6. ProjectsPage atualizada
+1. Migration (triggers + seed templates)
+2. Hook `useProjectDetail`
+3. `ProjectDetailPage` (maior prioridade — usuário acabou de criar projeto)
+4. `ProjectCard` dropdown
+5. `PromptsPage`, `TemplatesPage`, `VersionsPage`, `EvaluationsPage`
+6. `SettingsPage`, `ExportsPage`
