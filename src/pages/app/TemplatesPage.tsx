@@ -33,7 +33,7 @@ interface TemplateContent {
 const TemplatesPage = () => {
   const navigate = useNavigate();
   const { data: templates, isLoading, error } = useTemplates();
-  const { setIdea, setType, setNiche, setComplexity, setPlatform, setFeatures, setIntegrations, setMonetization } = useProjectWizard();
+  const { setIdea, setType, setNiche, setComplexity, setPlatform, addFeature, toggleIntegration, setMonetization, reset } = useProjectWizard();
   const [search, setSearch] = useState("");
   const [activeNiche, setActiveNiche] = useState<string | null>(null);
 

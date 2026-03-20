@@ -81,10 +81,10 @@ export function useUpdateProject(id: string | undefined) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (updates: Partial<Project>) => {
+    mutationFn: async (updates: Partial<Omit<Project, "metadata"> & { metadata?: Record<string, unknown> | null }>) => {
       const { data, error } = await supabase
         .from("projects")
-        .update(updates)
+        .update(updates as Record<string, unknown>)
         .eq("id", id!)
         .select()
         .single();
