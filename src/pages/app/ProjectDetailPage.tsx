@@ -1,14 +1,18 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Star, StarOff, ArrowLeft, Copy, Check, Layers, Lightbulb, Code2,
   Monitor, Database, ScrollText, Zap, Download, BarChart3, History,
-  Bot, MoreHorizontal, Trash2, Archive, Edit3, Tag, Users, Globe, Puzzle
+  Bot, MoreHorizontal, Trash2, Archive, Edit3, Tag, Users, Globe, Puzzle,
+  RefreshCw, AlertTriangle, AlertCircle, Lightbulb as LightbulbIcon, TrendingUp, ShieldAlert
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { useProjectDetail, useProjectPrompts, useProjectVersions, useUpdateProject, useDeleteProject } from "@/hooks/useProjectDetail";
 import { useToggleFavorite } from "@/hooks/useProjects";
+import AIStreamingIndicator from "@/components/AIStreamingIndicator";
 import ScoreRing from "@/components/ScoreRing";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
