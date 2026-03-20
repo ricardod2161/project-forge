@@ -1,7 +1,14 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Star, MoreHorizontal, Zap, Calendar } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Star, MoreHorizontal, Zap, Calendar, Archive, Eye, StarOff } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useToggleFavorite } from "@/hooks/useProjects";
+import { useUpdateProject } from "@/hooks/useProjectDetail";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ProjectCardProps {
   id: string;
@@ -16,23 +23,29 @@ interface ProjectCardProps {
 }
 
 const statusConfig = {
-  draft: { label: "Rascunho", classes: "bg-warning/10 text-warning border-warning/20" },
-  active: { label: "Ativo", classes: "bg-success/10 text-success border-success/20" },
+  draft:    { label: "Rascunho", classes: "bg-warning/10 text-warning border-warning/20" },
+  active:   { label: "Ativo",    classes: "bg-success/10 text-success border-success/20" },
   archived: { label: "Arquivado", classes: "bg-muted text-muted-foreground border-border" },
 };
 
 const ProjectCard = ({
-  id,
-  title,
-  description,
-  status,
-  score,
-  isFavorite = false,
-  niche,
-  updatedAt,
-  promptsCount = 0,
+  id, title, description, status, score, isFavorite = false, niche, updatedAt, promptsCount = 0,
 }: ProjectCardProps) => {
   const statusInfo = statusConfig[status];
+  const toggleFavorite = useToggleFavorite();
+  const updateProject = useUpdateProject(id);
+  const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleArchive = (e: React.MouseEvent) => {
+    e.preventDefault();
+    updateProject.mutate({ status: status === "archived" ? "draft" : "archived" });
+  };
+
+  const handleFavorite = (e: React.MouseEvent) => {
+    e.preventDefault();
+    toggleFavorite.mutate({ id, isFavorite });
+  };
 
   return (
     <motion.div
@@ -48,10 +61,7 @@ const ProjectCard = ({
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            <span className={cn(
-              "px-2 py-0.5 rounded-full text-2xs font-semibold border",
-              statusInfo.classes
-            )}>
+            <span className={cn("px-2 py-0.5 rounded-full text-2xs font-semibold border", statusInfo.classes)}>
               {statusInfo.label}
             </span>
             {niche && (
@@ -72,12 +82,38 @@ const ProjectCard = ({
 
         <div className="flex items-center gap-1 flex-shrink-0">
           {isFavorite && <Star className="w-3.5 h-3.5 text-warning fill-warning" />}
-          <button
-            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface transition-all"
-            aria-label="Opções do projeto"
-          >
-            <MoreHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
-          </button>
+
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={cn(
+                  "p-1 rounded hover:bg-surface transition-all",
+                  menuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                )}
+                aria-label="Opções do projeto"
+                onClick={e => e.preventDefault()}
+              >
+                <MoreHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onClick={() => navigate(`/app/projetos/${id}`)}>
+                <Eye className="w-3.5 h-3.5 mr-2" />
+                Ver detalhes
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleFavorite}>
+                {isFavorite
+                  ? <><StarOff className="w-3.5 h-3.5 mr-2" />Remover favorito</>
+                  : <><Star className="w-3.5 h-3.5 mr-2" />Adicionar favorito</>
+                }
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleArchive}>
+                <Archive className="w-3.5 h-3.5 mr-2" />
+                {status === "archived" ? "Desarquivar" : "Arquivar"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
