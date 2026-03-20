@@ -1,117 +1,75 @@
 
-## Auditoria Completa + Plano de Produção — Arquiteto IA
+## M13 — Revisão Automática por IA
 
-### Estado atual do sistema (diagnóstico honesto)
+### O que existe hoje
+- Aba "Revisão IA" na `ProjectDetailPage` exibe apenas um `EmptyTab` estático
+- Nenhuma Edge Function existe no projeto ainda (`supabase/functions/` vazio)
+- `LOVABLE_API_KEY` já está disponível como secret no Supabase
+- Estrutura do projeto (`Project` type) contém todos os campos necessários para análise
 
-**O que funciona:**
-- Auth (login/cadastro) operando com Supabase — confirmado pelas network requests
-- Wizard cria projetos e salva no banco (HTTP 201 confirmado nos logs)
-- Dashboard carrega métricas reais
-- ProjectsPage com busca/filtros funcional
-- Design system visual consistente
+### O que será construído
 
-**O que está quebrado ou incompleto (8 problemas críticos):**
+**1. Edge Function `review-project`**
+- Recebe `{ project_id }` no body
+- Valida JWT via `supabase` client (Authorization header)
+- Busca os dados do projeto na tabela `projects` (título, tipo, nicho, features, integrations, audience, monetização, complexidade, ideia original)
+- Monta um prompt de sistema especializado em arquitetura de software
+- Chama o Lovable AI Gateway (`https://ai.gateway.lovable.dev/v1/chat/completions`) com `google/gemini-3-flash-preview`
+- Usa tool calling para obter JSON estruturado com array de `findings`:
+  ```ts
+  interface Finding {
+    category: "lacuna" | "inconsistencia" | "melhoria" | "risco"
+    severity: "critico" | "importante" | "sugestao"
+    title: string
+    description: string
+    recommendation: string
+  }
+  ```
+- Trata erros 429 e 402 do AI Gateway com mensagens claras
+- CORS headers em todas as respostas
 
-1. **`ProjectDetailPage`** — Exibe apenas `Projeto #ID` hardcoded. Não carrega dados do Supabase. Abas são decorativas sem conteúdo. Prioridade máxima.
+**2. Hook `useProjectReview` no frontend**
+- `useMutation` que chama a edge function via `supabase.functions.invoke("review-project", { body: { project_id } })`
+- Armazena o resultado em estado local (não persiste no banco — análise sob demanda)
+- Retorna `{ findings, isLoading, error, mutate }`
 
-2. **`PromptsPage`** — Placeholder total. Mensagem "disponível após Etapa 5". Precisa mostrar todos os prompts do usuário por projeto.
+**3. Componente `AIReviewTab` em `ProjectDetailPage`**
 
-3. **`TemplatesPage`** — Placeholder. Precisa carregar da tabela `templates` (existe no banco).
+Estado inicial: painel com botão "Analisar Projeto com IA" + descrição do que a análise faz.
 
-4. **`VersionsPage`** — Placeholder. Precisa listar versões da tabela `project_versions`.
+Durante análise: skeleton loader com `AIStreamingIndicator` já existente.
 
-5. **`EvaluationsPage`** — Placeholder. Precisa listar projetos com scores.
+Após análise: lista de findings categorizados com:
+- Badge de severidade colorido: Crítico (vermelho), Importante (amarelo), Sugestão (verde/azul)
+- Badge de categoria: Lacuna, Inconsistência, Melhoria, Risco
+- Título e descrição do problema
+- Recomendação em destaque
+- Contadores no topo: "3 Críticos · 5 Importantes · 8 Sugestões"
+- Filtro por severidade (chips clicáveis)
+- Botão "Reanalisar" para nova execução
 
-6. **`SettingsPage`** — Cards decorativos sem ação. Perfil não edita nem salva.
-
-7. **`ExportsPage`** — Placeholder total.
-
-8. **`ProjectCard`** — Botão "Opções" (MoreHorizontal) não tem menu dropdown. Favoritar não chama API.
-
-**Triggers ausentes no banco:** As funções `update_updated_at_column` existem mas sem triggers registrados — o campo `updated_at` não está sendo atualizado automaticamente.
-
----
-
-### O que será implementado
-
-**1. Migration — triggers `updated_at` em todas as tabelas**
-- Criar trigger `update_updated_at` para `projects`, `prompts`, `project_versions`, `templates`, `profiles`
-
-**2. `ProjectDetailPage` — completamente reescrita**
-- Carrega dados reais via `useQuery` na tabela `projects` por `id`
-- Header com título real, status real, score ring animado
-- Abas com state local (`activeTab`)
-- **Aba "Visão Geral"**: exibe todos os campos do projeto (ideia, tipo, nicho, público, features, integrações, monetização)
-- **Aba "Ideia Original"**: textarea com texto bruto preservado
-- **Aba "Prompts"**: lista prompts do projeto com botão copiar
-- **Demais abas**: empty state elegante com CTA contextual (não "disponível na Etapa X")
-- Botão Favoritar funcional (chama `useToggleFavorite`)
-- Botão "Editar status" dropdown
-
-**3. `PromptsPage` — funcional**
-- Lista todos os prompts do usuário agrupados por projeto
-- Busca textual
-- Botão copiar com feedback visual ("Copiado!" 2s)
-- Empty state: "Crie um projeto e gere seus primeiros prompts"
-
-**4. `TemplatesPage` — funcional com dados reais**
-- Carrega da tabela `templates` via React Query
-- Filtros por nicho (chips)
-- Cards por template com título, descrição, nicho badge
-- Empty state enquanto não há templates seed
-- Seed: inserir 6 templates iniciais na migration
-
-**5. `VersionsPage` — funcional**
-- Lista versões agrupadas por projeto via React Query
-- Exibe `version_number`, `changes_summary`, `created_at`
-- Empty state contextual
-
-**6. `EvaluationsPage` — funcional**
-- Lista projetos com `quality_score` não nulo
-- Score ring (componente já existe) para cada projeto
-- Projetos sem score: empty state "Execute uma avaliação no projeto"
-
-**7. `SettingsPage` — funcional com persistência**
-- Seção "Perfil": input nome + email read-only + botão salvar → UPDATE na tabela `profiles`
-- Seção "Aparência": toggle dark/light (já funciona no header, replicar aqui)
-- Seção "Plano": carrega `plan` da tabela `profiles`
-- Demais seções: UI polida mas sem funcionalidade back-end ainda (scope claro)
-
-**8. `ExportsPage` — funcional com exportação real**
-- Carrega projetos do usuário
-- Seleciona projeto → exporta documentação técnica em texto estruturado
-- Botão "Copiar tudo" e "Baixar .txt"
-- Conteúdo gerado client-side a partir dos dados do projeto (sem Edge Function necessária)
-
-**9. `ProjectCard` — dropdown de ações**
-- Menu dropdown no botão MoreHorizontal: Favoritar/Desfavoritar, Arquivar, Ver detalhes
-- Favoritar chama `useToggleFavorite`
-
-**10. Hook `useProjectDetail` — novo hook**
-- `useProjectDetail(id)` → query `projects` por id + query `prompts` por project_id
-- Tipos corretos (sem `any`)
-
----
+Erros rate limit / créditos: toast com mensagem clara em português.
 
 ### Arquivos a criar/modificar
 
 | Arquivo | Ação |
 |---|---|
-| `supabase/migrations/[ts]_triggers.sql` | Criar — triggers updated_at + seed templates |
-| `src/hooks/useProjectDetail.ts` | Criar — hook para detalhes do projeto |
-| `src/pages/app/ProjectDetailPage.tsx` | Reescrever — real e funcional |
-| `src/pages/app/PromptsPage.tsx` | Reescrever — lista real de prompts |
-| `src/pages/app/TemplatesPage.tsx` | Reescrever — templates do banco |
-| `src/pages/app/VersionsPage.tsx` | Reescrever — versões reais |
-| `src/pages/app/EvaluationsPage.tsx` | Reescrever — scores reais |
-| `src/pages/app/SettingsPage.tsx` | Reescrever — perfil editável |
-| `src/pages/app/ExportsPage.tsx` | Reescrever — exportação funcional |
-| `src/components/ProjectCard.tsx` | Editar — dropdown de ações |
+| `supabase/functions/review-project/index.ts` | Criar — Edge Function completa |
+| `supabase/config.toml` | Editar — adicionar bloco `[functions.review-project]` |
+| `src/pages/app/ProjectDetailPage.tsx` | Editar — substituir `EmptyTab` da aba "ai" por `AIReviewTab` funcional |
+
+### Detalhes do prompt de IA (Edge Function)
+
+O system prompt instrui o modelo a agir como arquiteto sênior de software, analisando:
+- Completude dos requisitos (há funcionalidades críticas faltando para o tipo de sistema?)
+- Inconsistências entre campos (ex: tipo SaaS mas sem monetização definida)
+- Riscos técnicos baseados em complexidade vs features vs integrações
+- Lacunas comuns em projetos desse nicho específico
+- Melhorias de escopo e posicionamento
+
+O modelo retorna via tool calling um array estruturado — sem alucinações de formato.
 
 ### Ordem de execução
-1. Migration (triggers + seed templates)
-2. Hook `useProjectDetail`
-3. `ProjectDetailPage` (maior prioridade — usuário acabou de criar projeto)
-4. `ProjectCard` dropdown
-5. `PromptsPage`, `TemplatesPage`, `VersionsPage`, `EvaluationsPage`
-6. `SettingsPage`, `ExportsPage`
+1. Edge Function `review-project` + `config.toml`
+2. Componente `AIReviewTab` com hook integrado
+3. Substituir aba "ai" na `ProjectDetailPage`
