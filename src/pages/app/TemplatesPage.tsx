@@ -50,13 +50,14 @@ const TemplatesPage = () => {
 
   const handleUseTemplate = (template: typeof filtered[0]) => {
     const content = template.content as TemplateContent | null;
+    reset();
     setIdea(`Projeto baseado no template: ${template.title}\n\n${template.description ?? ""}`);
     if (content?.type) setType(content.type);
     setNiche(template.niche);
     if (content?.complexity) setComplexity(content.complexity);
     if (content?.platform) setPlatform(content.platform);
-    if (content?.features) setFeatures(content.features);
-    if (content?.integrations) setIntegrations(content.integrations);
+    if (content?.features) content.features.forEach(f => addFeature(f));
+    if (content?.integrations) content.integrations.forEach(i => toggleIntegration(i));
     if (content?.monetization) setMonetization(content.monetization);
     navigate("/app/projetos/novo");
   };
