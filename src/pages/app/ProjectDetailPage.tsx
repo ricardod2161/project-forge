@@ -757,7 +757,7 @@ const ProjectDetailPage = () => {
           {activeTab === "rules"     && <EmptyTab icon={ScrollText} title="Regras de negócio"       sub="As regras de negócio serão extraídas e documentadas automaticamente pela IA." />}
           {activeTab === "exports"   && <EmptyTab icon={Download}   title="Exportações"             sub="Exporte a documentação técnica completa do projeto em diferentes formatos." />}
           {activeTab === "eval"      && <EmptyTab icon={BarChart3}  title="Avaliação de qualidade"  sub="O score de qualidade será calculado após a análise completa do projeto." />}
-          {activeTab === "ai"        && <EmptyTab icon={Bot}        title="Revisão por IA"          sub="A IA irá analisar seu projeto e sugerir melhorias, inconsistências e oportunidades." />}
+          {activeTab === "ai"        && <AIReviewTab projectId={project.id} />}
         </div>
       </div>
 
