@@ -1,14 +1,18 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Star, StarOff, ArrowLeft, Copy, Check, Layers, Lightbulb, Code2,
   Monitor, Database, ScrollText, Zap, Download, BarChart3, History,
-  Bot, MoreHorizontal, Trash2, Archive, Edit3, Tag, Users, Globe, Puzzle
+  Bot, MoreHorizontal, Trash2, Archive, Edit3, Tag, Users, Globe, Puzzle,
+  RefreshCw, AlertTriangle, AlertCircle, Lightbulb as LightbulbIcon, TrendingUp, ShieldAlert
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { useProjectDetail, useProjectPrompts, useProjectVersions, useUpdateProject, useDeleteProject } from "@/hooks/useProjectDetail";
 import { useToggleFavorite } from "@/hooks/useProjects";
+import AIStreamingIndicator from "@/components/AIStreamingIndicator";
 import ScoreRing from "@/components/ScoreRing";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -227,6 +231,290 @@ const PromptsTab = ({ projectId }: { projectId: string }) => {
           </div>
         </div>
       ))}
+    </motion.div>
+  );
+};
+
+// ── Types for AI Review ───────────────────────────────────────────────────────
+interface Finding {
+  category: "lacuna" | "inconsistencia" | "melhoria" | "risco";
+  severity: "critico" | "importante" | "sugestao";
+  title: string;
+  description: string;
+  recommendation: string;
+}
+
+const severityConfig = {
+  critico: {
+    label: "Crítico",
+    classes: "bg-destructive/10 text-destructive border-destructive/30",
+    dot: "bg-destructive",
+    icon: ShieldAlert,
+  },
+  importante: {
+    label: "Importante",
+    classes: "bg-warning/10 text-warning border-warning/30",
+    dot: "bg-warning",
+    icon: AlertTriangle,
+  },
+  sugestao: {
+    label: "Sugestão",
+    classes: "bg-success/10 text-success border-success/30",
+    dot: "bg-success",
+    icon: LightbulbIcon,
+  },
+} as const;
+
+const categoryConfig = {
+  lacuna:       { label: "Lacuna",        classes: "bg-accent/10 text-accent border-accent/20" },
+  inconsistencia: { label: "Inconsistência", classes: "bg-warning/10 text-warning border-warning/20" },
+  melhoria:     { label: "Melhoria",      classes: "bg-primary/10 text-primary border-primary/20" },
+  risco:        { label: "Risco",         classes: "bg-destructive/10 text-destructive border-destructive/20" },
+} as const;
+
+// ── Tab: AI Review ────────────────────────────────────────────────────────────
+const AIReviewTab = ({ projectId }: { projectId: string }) => {
+  const [findings, setFindings] = useState<Finding[] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeSeverity, setActiveSeverity] = useState<Finding["severity"] | "all">("all");
+
+  const runReview = useCallback(async () => {
+    setIsLoading(true);
+    setFindings(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("review-project", {
+        body: { project_id: projectId },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        if (data.error.includes("Limite") || data.error.includes("429")) {
+          toast.error("Limite de requisições atingido. Aguarde alguns minutos e tente novamente.");
+        } else if (data.error.includes("Créditos") || data.error.includes("402")) {
+          toast.error("Créditos insuficientes. Acesse Configurações → Uso para adicionar créditos.");
+        } else {
+          toast.error(data.error);
+        }
+        return;
+      }
+      setFindings(data.findings ?? []);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao executar revisão";
+      if (msg.includes("rate") || msg.includes("429")) {
+        toast.error("Limite de requisições atingido. Aguarde alguns minutos.");
+      } else if (msg.includes("402")) {
+        toast.error("Créditos insuficientes. Acesse Configurações → Uso para adicionar créditos.");
+      } else {
+        toast.error(`Erro na revisão: ${msg}`);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId]);
+
+  const filtered = findings
+    ? activeSeverity === "all"
+      ? findings
+      : findings.filter((f) => f.severity === activeSeverity)
+    : [];
+
+  const counts = findings
+    ? {
+        critico: findings.filter((f) => f.severity === "critico").length,
+        importante: findings.filter((f) => f.severity === "importante").length,
+        sugestao: findings.filter((f) => f.severity === "sugestao").length,
+      }
+    : null;
+
+  // ── Initial state ─────────────────────────────────────────────────────────
+  if (!isLoading && !findings) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="flex flex-col items-center justify-center py-16 rounded-xl border border-dashed border-border gap-6"
+      >
+        <div className="w-16 h-16 rounded-2xl bg-primary/8 border border-primary/15 flex items-center justify-center">
+          <Bot className="w-7 h-7 text-primary/60" />
+        </div>
+        <div className="text-center max-w-sm">
+          <h3 className="text-sm font-semibold text-foreground mb-2">Revisão Automática por IA</h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            A IA analisa completude de requisitos, inconsistências entre campos, riscos técnicos,
+            lacunas de nicho e oportunidades de melhoria — retornando achados priorizados por severidade.
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-center gap-2 text-2xs text-muted-foreground">
+          {[
+            { icon: ShieldAlert, label: "Críticos" },
+            { icon: AlertTriangle, label: "Importantes" },
+            { icon: TrendingUp, label: "Sugestões" },
+          ].map(({ icon: Icon, label }) => (
+            <span key={label} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-surface">
+              <Icon className="w-3 h-3" />
+              {label}
+            </span>
+          ))}
+        </div>
+        <button
+          onClick={runReview}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 shadow-sm"
+        >
+          <Bot className="w-4 h-4" />
+          Analisar Projeto com IA
+        </button>
+      </motion.div>
+    );
+  }
+
+  // ── Loading state ─────────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+        <div className="flex items-center justify-center py-8">
+          <AIStreamingIndicator label="IA analisando projeto..." size="md" />
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="p-4 rounded-xl border border-border bg-card animate-pulse">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-muted/60" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-muted/60 rounded w-2/3" />
+                  <div className="h-2 bg-muted/40 rounded w-full" />
+                  <div className="h-2 bg-muted/40 rounded w-4/5" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    );
+  }
+
+  // ── Results ───────────────────────────────────────────────────────────────
+  return (
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-4">
+      {/* Summary bar */}
+      <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-border bg-card">
+        <div className="flex items-center gap-4 flex-wrap">
+          {counts && (
+            <>
+              <span className="text-2xs font-medium text-muted-foreground">{findings!.length} achados</span>
+              {counts.critico > 0 && (
+                <span className="flex items-center gap-1 text-2xs font-semibold text-destructive">
+                  <ShieldAlert className="w-3 h-3" />
+                  {counts.critico} crítico{counts.critico !== 1 ? "s" : ""}
+                </span>
+              )}
+              {counts.importante > 0 && (
+                <span className="flex items-center gap-1 text-2xs font-semibold text-warning">
+                  <AlertTriangle className="w-3 h-3" />
+                  {counts.importante} importante{counts.importante !== 1 ? "s" : ""}
+                </span>
+              )}
+              {counts.sugestao > 0 && (
+                <span className="flex items-center gap-1 text-2xs font-semibold text-success">
+                  <LightbulbIcon className="w-3 h-3" />
+                  {counts.sugestao} sugestão{counts.sugestao !== 1 ? "ões" : ""}
+                </span>
+              )}
+            </>
+          )}
+        </div>
+        <button
+          onClick={runReview}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 hover:text-primary text-2xs font-medium text-muted-foreground transition-all duration-150"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Reanalisar
+        </button>
+      </div>
+
+      {/* Severity filter chips */}
+      <div className="flex gap-2 flex-wrap">
+        {(["all", "critico", "importante", "sugestao"] as const).map((s) => {
+          const isAll = s === "all";
+          const cfg = !isAll ? severityConfig[s] : null;
+          const count = !isAll && counts ? counts[s] : findings?.length ?? 0;
+          return (
+            <button
+              key={s}
+              onClick={() => setActiveSeverity(s)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1 rounded-full text-2xs font-medium border transition-all duration-150",
+                activeSeverity === s
+                  ? isAll
+                    ? "bg-foreground text-background border-foreground"
+                    : cn(cfg?.classes, "shadow-sm")
+                  : "border-border text-muted-foreground hover:border-border/80 hover:text-foreground"
+              )}
+            >
+              {cfg?.icon && <cfg.icon className="w-3 h-3" />}
+              {isAll ? "Todos" : cfg?.label}
+              <span className={cn(
+                "ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold",
+                activeSeverity === s ? "bg-white/20" : "bg-muted text-muted-foreground"
+              )}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Findings list */}
+      <AnimatePresence mode="popLayout">
+        <div className="space-y-3">
+          {filtered.map((finding, index) => {
+            const sev = severityConfig[finding.severity];
+            const cat = categoryConfig[finding.category];
+            const SevIcon = sev.icon;
+            return (
+              <motion.div
+                key={`${finding.title}-${index}`}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.2, delay: index * 0.04 }}
+                className="p-4 rounded-xl border border-border bg-card hover:border-border/80 transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  <div className={cn("w-8 h-8 rounded-lg border flex items-center justify-center flex-shrink-0 mt-0.5", sev.classes)}>
+                    <SevIcon className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                      <span className={cn("px-2 py-0.5 rounded-full text-2xs font-semibold border", sev.classes)}>
+                        {sev.label}
+                      </span>
+                      <span className={cn("px-2 py-0.5 rounded-full text-2xs font-medium border", cat.classes)}>
+                        {cat.label}
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-semibold text-foreground mb-1">{finding.title}</h4>
+                    <p className="text-2xs text-muted-foreground leading-relaxed mb-3">{finding.description}</p>
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/10">
+                      <AlertCircle className="w-3 h-3 text-primary flex-shrink-0 mt-0.5" />
+                      <p className="text-2xs text-foreground leading-relaxed">
+                        <span className="font-semibold text-primary">Recomendação: </span>
+                        {finding.recommendation}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-10 rounded-xl border border-dashed border-border">
+              <Check className="w-8 h-8 text-success mb-3" />
+              <p className="text-xs font-medium text-foreground">Nenhum achado nesta categoria</p>
+              <p className="text-2xs text-muted-foreground mt-1">Tente outro filtro ou reanalisar o projeto.</p>
+            </div>
+          )}
+        </div>
+      </AnimatePresence>
     </motion.div>
   );
 };
@@ -469,7 +757,7 @@ const ProjectDetailPage = () => {
           {activeTab === "rules"     && <EmptyTab icon={ScrollText} title="Regras de negócio"       sub="As regras de negócio serão extraídas e documentadas automaticamente pela IA." />}
           {activeTab === "exports"   && <EmptyTab icon={Download}   title="Exportações"             sub="Exporte a documentação técnica completa do projeto em diferentes formatos." />}
           {activeTab === "eval"      && <EmptyTab icon={BarChart3}  title="Avaliação de qualidade"  sub="O score de qualidade será calculado após a análise completa do projeto." />}
-          {activeTab === "ai"        && <EmptyTab icon={Bot}        title="Revisão por IA"          sub="A IA irá analisar seu projeto e sugerir melhorias, inconsistências e oportunidades." />}
+          {activeTab === "ai"        && <AIReviewTab projectId={project.id} />}
         </div>
       </div>
 
