@@ -1,8 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+
+// Auth
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 // Layouts
 import AppLayout from "@/layouts/AppLayout";
@@ -38,39 +42,60 @@ const queryClient = new QueryClient({
   },
 });
 
+// Redireciona usuário logado para fora das páginas de auth
+const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
+  if (user) return <Navigate to="/app" replace />;
+  return <>{children}</>;
+};
+
+const AppRoutes = () => (
+  <Routes>
+    {/* ── Rotas públicas ── */}
+    <Route path="/" element={<LandingPage />} />
+    <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+    <Route path="/cadastro" element={<PublicOnlyRoute><CadastroPage /></PublicOnlyRoute>} />
+    <Route path="/recuperar-senha" element={<RecuperarSenhaPage />} />
+
+    {/* ── Rotas do app autenticado ── */}
+    <Route
+      path="/app"
+      element={
+        <ProtectedRoute>
+          <AppLayout />
+        </ProtectedRoute>
+      }
+    >
+      <Route index element={<DashboardPage />} />
+      <Route path="projetos" element={<ProjectsPage />} />
+      <Route path="projetos/novo" element={<NewProjectPage />} />
+      <Route path="projetos/:id" element={<ProjectDetailPage />} />
+      <Route path="templates" element={<TemplatesPage />} />
+      <Route path="prompts" element={<PromptsPage />} />
+      <Route path="exportacoes" element={<ExportsPage />} />
+      <Route path="versoes" element={<VersionsPage />} />
+      <Route path="avaliacoes" element={<EvaluationsPage />} />
+      <Route path="configuracoes" element={<SettingsPage />} />
+      <Route path="planos" element={<PlansPage />} />
+    </Route>
+
+    {/* Onboarding — sem sidebar */}
+    <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
+
+    <Route path="*" element={<NotFound />} />
+  </Routes>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          {/* ── Rotas públicas ── */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/cadastro" element={<CadastroPage />} />
-          <Route path="/recuperar-senha" element={<RecuperarSenhaPage />} />
-
-          {/* ── Rotas do app autenticado ── */}
-          <Route path="/app" element={<AppLayout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="projetos" element={<ProjectsPage />} />
-            <Route path="projetos/novo" element={<NewProjectPage />} />
-            <Route path="projetos/:id" element={<ProjectDetailPage />} />
-            <Route path="templates" element={<TemplatesPage />} />
-            <Route path="prompts" element={<PromptsPage />} />
-            <Route path="exportacoes" element={<ExportsPage />} />
-            <Route path="versoes" element={<VersionsPage />} />
-            <Route path="avaliacoes" element={<EvaluationsPage />} />
-            <Route path="configuracoes" element={<SettingsPage />} />
-            <Route path="planos" element={<PlansPage />} />
-          </Route>
-
-          {/* Onboarding — sem sidebar */}
-          <Route path="/onboarding" element={<OnboardingPage />} />
-
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

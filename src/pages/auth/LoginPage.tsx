@@ -1,8 +1,32 @@
-import { Link } from "react-router-dom";
-import { Sparkles, ArrowRight, Mail, Lock } from "lucide-react";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Sparkles, ArrowRight, Mail, Lock, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 const LoginPage = () => {
+  const navigate = useNavigate();
+  const { signIn } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
+    const { error } = await signIn(email, password);
+    if (error) {
+      setError("E-mail ou senha inválidos. Verifique e tente novamente.");
+    } else {
+      navigate("/app");
+    }
+
+    setIsLoading(false);
+  };
+
   return (
     <div className="min-h-screen flex bg-background">
       {/* Coluna esquerda — identidade visual */}
@@ -29,13 +53,22 @@ const LoginPage = () => {
             <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center shadow-glow">
               <Sparkles className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-display font-bold text-foreground">Arquiteto <span className="text-gradient">IA</span></span>
+            <span className="font-display font-bold text-foreground">
+              Arquiteto <span className="text-gradient">IA</span>
+            </span>
           </div>
 
           <h2 className="font-display font-bold text-lg mb-1">Bem-vindo de volta</h2>
           <p className="text-muted-foreground text-xs mb-8">Entre com sua conta para continuar</p>
 
-          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+          {error && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs mb-4">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {error}
+            </div>
+          )}
+
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
               <label className="block text-xs font-medium text-foreground mb-1.5">E-mail</label>
               <div className="relative">
@@ -43,11 +76,15 @@ const LoginPage = () => {
                 <input
                   type="email"
                   placeholder="seu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
                   className={cn(
                     "w-full pl-10 pr-4 py-2.5 rounded-lg text-xs",
                     "bg-input border border-border text-foreground placeholder:text-muted-foreground",
                     "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                    "transition-all duration-150"
+                    "transition-all duration-150 disabled:opacity-50"
                   )}
                 />
               </div>
@@ -59,11 +96,15 @@ const LoginPage = () => {
                 <input
                   type="password"
                   placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
                   className={cn(
                     "w-full pl-10 pr-4 py-2.5 rounded-lg text-xs",
                     "bg-input border border-border text-foreground placeholder:text-muted-foreground",
                     "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                    "transition-all duration-150"
+                    "transition-all duration-150 disabled:opacity-50"
                   )}
                 />
               </div>
@@ -76,13 +117,22 @@ const LoginPage = () => {
 
             <button
               type="submit"
+              disabled={isLoading}
               className={cn(
                 "w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-semibold",
                 "bg-gradient-primary text-primary-foreground",
-                "hover:shadow-glow transition-all duration-200 active:scale-[0.98]"
+                "hover:shadow-glow transition-all duration-200 active:scale-[0.98]",
+                "disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
               )}
             >
-              Entrar <ArrowRight className="w-3.5 h-3.5" />
+              {isLoading ? (
+                <>
+                  <div className="w-3.5 h-3.5 rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground animate-spin" />
+                  Entrando...
+                </>
+              ) : (
+                <>Entrar <ArrowRight className="w-3.5 h-3.5" /></>
+              )}
             </button>
           </form>
 
