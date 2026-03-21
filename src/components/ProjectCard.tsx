@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Star, MoreHorizontal, Zap, Calendar, Archive, Eye, StarOff, ArrowRight, Copy } from "lucide-react";
+import { Star, MoreHorizontal, Zap, Calendar, Archive, Eye, StarOff, ArrowRight, Copy, Globe } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useToggleFavorite, useDuplicateProject } from "@/hooks/useProjects";
@@ -20,6 +20,7 @@ interface ProjectCardProps {
   niche?: string;
   updatedAt?: string;
   promptsCount?: number;
+  mode?: "system" | "website";
 }
 
 const statusConfig = {
@@ -35,7 +36,7 @@ const scoreBg = (s: number) =>
   s >= 80 ? "bg-success" : s >= 60 ? "bg-primary" : s >= 40 ? "bg-warning" : "bg-destructive";
 
 const ProjectCard = ({
-  id, title, description, status, score, isFavorite = false, niche, updatedAt, promptsCount = 0,
+  id, title, description, status, score, isFavorite = false, niche, updatedAt, promptsCount = 0, mode,
 }: ProjectCardProps) => {
   const statusInfo = statusConfig[status] ?? statusConfig.draft;
   const toggleFavorite = useToggleFavorite();
@@ -78,6 +79,12 @@ const ProjectCard = ({
               {niche && (
                 <span className="px-2 py-0.5 rounded-full text-2xs font-medium bg-accent/10 text-accent border border-accent/20 truncate max-w-[80px]">
                   {niche}
+                </span>
+              )}
+              {mode === "website" && (
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-success/10 text-success border border-success/20">
+                  <Globe className="w-2.5 h-2.5" />
+                  Site
                 </span>
               )}
             </div>

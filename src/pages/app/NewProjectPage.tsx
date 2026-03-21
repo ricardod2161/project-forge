@@ -1,5 +1,5 @@
 import { useState, useEffect, KeyboardEvent } from "react";
-import { ArrowLeft, Sparkles, X, Check, Plus, Loader2, Save } from "lucide-react";
+import { ArrowLeft, Sparkles, X, Check, Plus, Loader2, Save, Cpu, Globe } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useProjectWizard } from "@/hooks/useProjectWizard";
@@ -7,20 +7,72 @@ import { useCreateProject } from "@/hooks/useProjects";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STEPS = ["Ideia", "Classificação", "Detalhamento", "Confirmação"];
 const IDEA_MIN_CHARS = 30;
 const AUDIENCE_MIN_CHARS = 10;
 
 const PROJECT_TYPES = [
-  { value: "saas", label: "SaaS", emoji: "☁️", desc: "Software como serviço" },
-  { value: "app", label: "App Mobile", emoji: "📱", desc: "iOS / Android" },
-  { value: "erp", label: "ERP / CRM", emoji: "🏢", desc: "Sistema de gestão" },
-  { value: "ecommerce", label: "E-commerce", emoji: "🛒", desc: "Loja virtual" },
-  { value: "marketplace", label: "Marketplace", emoji: "🔀", desc: "Plataforma multi-vendedor" },
-  { value: "landing", label: "Landing Page", emoji: "🎯", desc: "Página de conversão" },
+  { value: "saas",        label: "SaaS",          emoji: "☁️", desc: "Software como serviço" },
+  { value: "app",         label: "App Mobile",    emoji: "📱", desc: "iOS / Android" },
+  { value: "erp",         label: "ERP / CRM",     emoji: "🏢", desc: "Sistema de gestão" },
+  { value: "ecommerce",   label: "E-commerce",    emoji: "🛒", desc: "Loja virtual" },
+  { value: "marketplace", label: "Marketplace",   emoji: "🔀", desc: "Plataforma multi-vendedor" },
+  { value: "landing",     label: "Landing Page",  emoji: "🎯", desc: "Página de conversão" },
+];
+
+const WEBSITE_TYPES = [
+  { value: "landing",        label: "Landing Page",     emoji: "🎯", desc: "Conversão e captação de leads" },
+  { value: "institucional",  label: "Institucional",    emoji: "🏢", desc: "Presença digital da empresa" },
+  { value: "portfolio",      label: "Portfólio",        emoji: "🎨", desc: "Apresentação de trabalhos" },
+  { value: "blog",           label: "Blog / Conteúdo",  emoji: "✍️", desc: "Artigos e publicações" },
+  { value: "ecommerce_site", label: "Loja Virtual",     emoji: "🛍️", desc: "Loja com carrinho e pagamento" },
+  { value: "evento",         label: "Site de Evento",   emoji: "🎪", desc: "Conferência, curso, lançamento" },
+  { value: "saas_landing",   label: "SaaS Landing",     emoji: "☁️", desc: "Apresentação de software" },
+  { value: "restaurante",    label: "Restaurante",      emoji: "🍽️", desc: "Cardápio, reservas, delivery" },
+  { value: "clinica",        label: "Clínica / Saúde",  emoji: "🏥", desc: "Serviços e agendamento médico" },
+  { value: "agencia",        label: "Agência / Freela", emoji: "💼", desc: "Serviços criativos ou técnicos" },
+  { value: "imobiliaria",    label: "Imobiliária",      emoji: "🏠", desc: "Listagem e captação de imóveis" },
+  { value: "outro_site",     label: "Outro",            emoji: "🌐", desc: "Outro tipo de site" },
+];
+
+const WEBSITE_SECTIONS = [
+  "Hero / Capa", "Sobre / Quem somos", "Serviços / O que fazemos",
+  "Portfólio / Cases", "Depoimentos / Reviews", "Preços / Planos",
+  "FAQ", "Blog / Notícias", "Galeria de fotos", "Formulário de contato",
+  "Mapa / Localização", "Equipe", "Parceiros / Clientes",
+  "CTA / Chamada para ação", "Área do cliente (login)",
+  "Checkout / Pagamento", "Newsletter", "Cronômetro / Countdown",
+];
+
+const WEBSITE_STYLES = [
+  { value: "minimalista",  label: "Minimalista",    emoji: "⬜", desc: "Limpo, espaçoso, tipografia forte" },
+  { value: "corporativo",  label: "Corporativo",    emoji: "🔷", desc: "Sério, confiável, profissional" },
+  { value: "criativo",     label: "Criativo",       emoji: "🎨", desc: "Colorido, ousado, fora do padrão" },
+  { value: "tech",         label: "Tech / Dark",    emoji: "🖥️", desc: "Escuro, futurista, moderno" },
+  { value: "elegante",     label: "Elegante / Luxo",emoji: "✨", desc: "Premium, sofisticado, refinado" },
+  { value: "amigavel",     label: "Amigável",       emoji: "😊", desc: "Colorido, acessível, jovem" },
+  { value: "fotografico",  label: "Fotográfico",    emoji: "📸", desc: "Imagens grandes, visual forte" },
+  { value: "editorial",    label: "Editorial",      emoji: "📰", desc: "Tipografia dominante" },
+];
+
+const WEBSITE_TONES = [
+  "Formal e profissional", "Descontraído e próximo",
+  "Técnico e especializado", "Inspirador e motivacional",
+  "Jovem e dinâmico", "Luxuoso e exclusivo", "Didático e educativo",
+];
+
+const WEBSITE_CMS_OPTIONS = [
+  "Sem CMS", "Notion como CMS", "Sanity", "Contentful", "Strapi", "WordPress",
+];
+
+const WEBSITE_INTEGRATIONS = [
+  "Google Analytics", "Google Tag Manager", "Meta Pixel", "Hotjar",
+  "WhatsApp Business", "Stripe", "MercadoPago", "Mailchimp",
+  "RD Station", "HubSpot", "Calendly", "Typeform",
+  "Instagram Feed", "Google Maps", "YouTube embed",
 ];
 
 const NICHES = [
@@ -32,17 +84,24 @@ const NICHES = [
 const PLATFORMS = ["Web", "iOS", "Android", "Web + Mobile", "Desktop", "API / Backend"];
 
 const MONETIZATIONS = [
-  { value: "subscription", label: "Assinatura", desc: "Planos mensais/anuais" },
-  { value: "freemium", label: "Freemium", desc: "Grátis com premium" },
-  { value: "one-time", label: "Licença única", desc: "Pagamento único" },
-  { value: "marketplace", label: "Comissão", desc: "% sobre transações" },
-  { value: "ads", label: "Publicidade", desc: "Anúncios e banners" },
-  { value: "none", label: "Sem monetização", desc: "Uso interno / gratuito" },
+  { value: "subscription", label: "Assinatura",      desc: "Planos mensais/anuais" },
+  { value: "freemium",     label: "Freemium",        desc: "Grátis com premium" },
+  { value: "one-time",     label: "Licença única",   desc: "Pagamento único" },
+  { value: "marketplace",  label: "Comissão",        desc: "% sobre transações" },
+  { value: "ads",          label: "Publicidade",     desc: "Anúncios e banners" },
+  { value: "none",         label: "Sem monetização", desc: "Uso interno / gratuito" },
 ];
 
 const INTEGRATIONS_LIST = [
   "Stripe", "MercadoPago", "PagSeguro", "WhatsApp", "SendGrid",
   "Firebase", "Google Analytics", "Zapier", "OpenAI", "Twilio",
+];
+
+const LOADING_MESSAGES = [
+  "Analisando sua ideia...",
+  "Identificando módulos e funcionalidades...",
+  "Estruturando a arquitetura do sistema...",
+  "Salvando projeto no banco de dados...",
 ];
 
 // ─── Auto-save indicator ──────────────────────────────────────────────────────
@@ -62,12 +121,100 @@ const AutoSaveIndicator = ({ lastSaved }: { lastSaved: Date | null }) => {
   );
 };
 
-// ─── Step Components ──────────────────────────────────────────────────────────
+// ─── Step 0 — StepModo ────────────────────────────────────────────────────────
+
+const StepModo = () => {
+  const { setMode, nextStep } = useProjectWizard();
+
+  const handleSelect = (m: "system" | "website") => {
+    setMode(m);
+    nextStep();
+  };
+
+  const cards = [
+    {
+      mode: "system" as const,
+      icon: Cpu,
+      title: "Sistema ou App",
+      description: "Plataforma completa com banco de dados, autenticação e lógica de negócio",
+      chips: ["SaaS", "ERP", "App Mobile", "Marketplace", "Dashboard"],
+      gradient: "from-primary/10 to-primary/5",
+      borderActive: "border-primary/60",
+      iconBg: "bg-primary/15 text-primary",
+    },
+    {
+      mode: "website" as const,
+      icon: Globe,
+      title: "Site ou Página Web",
+      description: "Site moderno com design, conteúdo, SEO e conversão",
+      chips: ["Landing Page", "Portfólio", "Institucional", "Blog", "Loja"],
+      gradient: "from-accent/10 to-accent/5",
+      borderActive: "border-accent/60",
+      iconBg: "bg-accent/15 text-accent",
+    },
+  ];
+
+  return (
+    <div className="p-8 rounded-xl border border-border bg-card space-y-6">
+      <div>
+        <h2 className="font-display font-semibold text-sm text-foreground mb-1">O que você quer criar?</h2>
+        <p className="text-muted-foreground text-xs">Escolha o tipo de projeto para adaptar o fluxo.</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {cards.map((card, i) => {
+          const Icon = card.icon;
+          return (
+            <motion.button
+              key={card.mode}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1, duration: 0.3 }}
+              onClick={() => handleSelect(card.mode)}
+              className={cn(
+                "group relative flex flex-col items-start text-left p-6 rounded-xl border-2 transition-all duration-200",
+                "border-border hover:border-primary/40 hover:shadow-card-hover bg-gradient-to-br",
+                card.gradient
+              )}
+            >
+              <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-all", card.iconBg)}>
+                <Icon className="w-6 h-6" />
+              </div>
+              <h3 className="font-display font-bold text-sm text-foreground mb-2 group-hover:text-primary transition-colors">
+                {card.title}
+              </h3>
+              <p className="text-2xs text-muted-foreground leading-relaxed mb-4">
+                {card.description}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {card.chips.map(chip => (
+                  <span key={chip} className="px-2 py-0.5 rounded-full text-2xs bg-background/60 border border-border text-muted-foreground">
+                    {chip}
+                  </span>
+                ))}
+              </div>
+              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                  <span className="text-primary-foreground text-xs font-bold">→</span>
+                </div>
+              </div>
+            </motion.button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ─── Step 1 — Ideia ───────────────────────────────────────────────────────────
 
 const StepIdeia = () => {
-  const { idea, setIdea, nextStep } = useProjectWizard();
+  const { idea, setIdea, nextStep, prevStep, mode } = useProjectWizard();
   const [isRefining, setIsRefining] = useState(false);
   const isValid = idea.trim().length >= IDEA_MIN_CHARS;
+
+  const placeholder = mode === "website"
+    ? "Ex: Um site institucional para uma clínica odontológica em São Paulo, com apresentação dos serviços, galeria de antes/depois, formulário de agendamento online e depoimentos de pacientes..."
+    : "Ex: Um sistema de agendamento para barbearias com múltiplos profissionais, controle de estoque, caixa integrado e app para clientes acompanharem fila em tempo real...";
 
   const handleRefineWithAI = async () => {
     if (idea.trim().length < 20) {
@@ -104,14 +251,16 @@ const StepIdeia = () => {
   return (
     <div className="p-8 rounded-xl border border-border bg-card space-y-5">
       <div>
-        <h2 className="font-display font-semibold text-sm text-foreground mb-1">Descreva sua ideia</h2>
+        <h2 className="font-display font-semibold text-sm text-foreground mb-1">
+          {mode === "website" ? "Descreva o site" : "Descreva sua ideia"}
+        </h2>
         <p className="text-muted-foreground text-xs">Escreva livremente — sem formato obrigatório.</p>
       </div>
       <div className="relative">
         <textarea
           value={idea}
           onChange={(e) => setIdea(e.target.value)}
-          placeholder="Ex: Um sistema de agendamento para barbearias com múltiplos profissionais, controle de estoque de produtos, caixa integrado e app para clientes acompanharem fila em tempo real..."
+          placeholder={placeholder}
           className={cn(
             "w-full h-40 px-4 py-3 rounded-lg text-xs resize-none",
             "bg-input border text-foreground placeholder:text-muted-foreground",
@@ -129,7 +278,6 @@ const StepIdeia = () => {
         </span>
       </div>
 
-      {/* Inline validation message */}
       <AnimatePresence>
         {idea.trim().length > 0 && !isValid && (
           <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -142,35 +290,45 @@ const StepIdeia = () => {
 
       <div className="flex items-center justify-between">
         <button
-          onClick={handleRefineWithAI}
-          disabled={isRefining || idea.trim().length < 20}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all",
-            "border border-primary/40 text-primary hover:bg-primary/10",
-            "disabled:opacity-50 disabled:cursor-not-allowed"
-          )}
+          onClick={prevStep}
+          className="px-4 py-2 rounded-lg text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all"
         >
-          {isRefining ? (
-            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Refinando...</>
-          ) : (
-            <><Sparkles className="w-3.5 h-3.5" /> Refinar com IA</>
-          )}
+          ← Voltar
         </button>
-        <button
-          onClick={nextStep}
-          disabled={!isValid}
-          className={cn(
-            "px-6 py-2 rounded-lg text-xs font-semibold transition-all",
-            "bg-gradient-primary text-primary-foreground hover:shadow-glow",
-            "disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
-          )}
-        >
-          Próximo →
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefineWithAI}
+            disabled={isRefining || idea.trim().length < 20}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all",
+              "border border-primary/40 text-primary hover:bg-primary/10",
+              "disabled:opacity-50 disabled:cursor-not-allowed"
+            )}
+          >
+            {isRefining ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Refinando...</>
+            ) : (
+              <><Sparkles className="w-3.5 h-3.5" /> Refinar com IA</>
+            )}
+          </button>
+          <button
+            onClick={nextStep}
+            disabled={!isValid}
+            className={cn(
+              "px-6 py-2 rounded-lg text-xs font-semibold transition-all",
+              "bg-gradient-primary text-primary-foreground hover:shadow-glow",
+              "disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
+            )}
+          >
+            Próximo →
+          </button>
+        </div>
       </div>
     </div>
   );
 };
+
+// ─── Step 2a — Classificação (sistema) ───────────────────────────────────────
 
 const StepClassificacao = () => {
   const {
@@ -185,10 +343,7 @@ const StepClassificacao = () => {
   const [attempted, setAttempted] = useState(false);
 
   const handleNext = () => {
-    if (!isValid) {
-      setAttempted(true);
-      return;
-    }
+    if (!isValid) { setAttempted(true); return; }
     nextStep();
   };
 
@@ -322,6 +477,8 @@ const StepClassificacao = () => {
   );
 };
 
+// ─── Step 3a — Detalhamento (sistema) ────────────────────────────────────────
+
 const StepDetalhamento = () => {
   const {
     audience, setAudience,
@@ -350,10 +507,7 @@ const StepDetalhamento = () => {
   };
 
   const handleNext = () => {
-    if (!isAudienceValid) {
-      setAttempted(true);
-      return;
-    }
+    if (!isAudienceValid) { setAttempted(true); return; }
     nextStep();
   };
 
@@ -428,10 +582,7 @@ const StepDetalhamento = () => {
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium bg-primary/10 text-primary border border-primary/20"
               >
                 {f}
-                <button
-                  onClick={() => removeFeature(f)}
-                  className="hover:text-destructive transition-colors"
-                >
+                <button onClick={() => removeFeature(f)} className="hover:text-destructive transition-colors">
                   <X className="w-3 h-3" />
                 </button>
               </span>
@@ -506,12 +657,257 @@ const StepDetalhamento = () => {
   );
 };
 
-const LOADING_MESSAGES = [
-  "Analisando sua ideia...",
-  "Identificando módulos e funcionalidades...",
-  "Estruturando a arquitetura do sistema...",
-  "Salvando projeto no banco de dados...",
-];
+// ─── Step 2b — Site (website) ─────────────────────────────────────────────────
+
+const StepSite = () => {
+  const {
+    type, setType,
+    niche, setNiche,
+    websiteSections, toggleWebsiteSection,
+    websiteStyle, setWebsiteStyle,
+    websiteTone, setWebsiteTone,
+    websiteHasEcommerce, setWebsiteHasEcommerce,
+    websiteHasBlog, setWebsiteHasBlog,
+    websiteHasForm, setWebsiteHasForm,
+    websiteCMS, setWebsiteCMS,
+    integrations, toggleIntegration,
+    nextStep, prevStep,
+  } = useProjectWizard();
+
+  const [attempted, setAttempted] = useState(false);
+  const isValid = !!type && !!websiteStyle && !!niche;
+
+  const handleNext = () => {
+    if (!isValid) { setAttempted(true); return; }
+    nextStep();
+  };
+
+  return (
+    <div className="p-8 rounded-xl border border-border bg-card space-y-7">
+      <div>
+        <h2 className="font-display font-semibold text-sm text-foreground mb-1">Configure o site</h2>
+        <p className="text-muted-foreground text-xs">Detalhes para personalizar o site ao seu nicho e estilo.</p>
+      </div>
+
+      {/* Tipo de site */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium text-foreground">Que tipo de site você quer criar?</label>
+          {attempted && !type && <span className="text-2xs text-warning">Selecione um tipo</span>}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {WEBSITE_TYPES.map((wt) => (
+            <button
+              key={wt.value}
+              onClick={() => setType(wt.value)}
+              className={cn(
+                "flex flex-col items-start p-3 rounded-lg border text-left transition-all",
+                type === wt.value
+                  ? "border-primary bg-primary/10 text-primary"
+                  : attempted && !type
+                    ? "border-warning/40 bg-warning/5 hover:border-warning/60 text-foreground"
+                    : "border-border bg-surface/30 hover:border-primary/30 text-foreground"
+              )}
+            >
+              <span className="text-base mb-1">{wt.emoji}</span>
+              <span className="text-xs font-semibold">{wt.label}</span>
+              <span className="text-2xs text-muted-foreground">{wt.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Nicho */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium text-foreground">Setor / Nicho de mercado</label>
+          {attempted && !niche && <span className="text-2xs text-warning">Selecione um nicho</span>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {NICHES.map((n) => (
+            <button
+              key={n}
+              onClick={() => setNiche(n)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-2xs font-medium border transition-all",
+                niche === n
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-surface/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              )}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Seções */}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-foreground">Quais seções o site deve ter? (múltipla seleção)</label>
+        <div className="flex flex-wrap gap-2">
+          {WEBSITE_SECTIONS.map((section) => (
+            <button
+              key={section}
+              onClick={() => toggleWebsiteSection(section)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-2xs font-medium border transition-all",
+                websiteSections.includes(section)
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-surface/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              )}
+            >
+              {websiteSections.includes(section) && <Check className="w-3 h-3 inline mr-1" />}
+              {section}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Estilo visual */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium text-foreground">Estilo visual</label>
+          {attempted && !websiteStyle && <span className="text-2xs text-warning">Selecione um estilo</span>}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {WEBSITE_STYLES.map((ws) => (
+            <button
+              key={ws.value}
+              onClick={() => setWebsiteStyle(ws.value)}
+              className={cn(
+                "flex flex-col items-start p-3 rounded-lg border text-left transition-all",
+                websiteStyle === ws.value
+                  ? "border-primary bg-primary/10 text-primary"
+                  : attempted && !websiteStyle
+                    ? "border-warning/40 bg-warning/5 hover:border-warning/60 text-foreground"
+                    : "border-border bg-surface/30 hover:border-primary/30 text-foreground"
+              )}
+            >
+              <span className="text-base mb-1">{ws.emoji}</span>
+              <span className="text-xs font-semibold">{ws.label}</span>
+              <span className="text-2xs text-muted-foreground">{ws.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tom de comunicação */}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-foreground">Tom de comunicação</label>
+        <div className="flex flex-wrap gap-2">
+          {WEBSITE_TONES.map((tone) => (
+            <button
+              key={tone}
+              onClick={() => setWebsiteTone(tone)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-2xs font-medium border transition-all",
+                websiteTone === tone
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-surface/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              )}
+            >
+              {tone}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Recursos extras */}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-foreground">Recursos adicionais</label>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+            <div>
+              <p className="text-xs font-medium text-foreground">Loja / E-commerce</p>
+              <p className="text-2xs text-muted-foreground">Catálogo, carrinho e checkout</p>
+            </div>
+            <Switch checked={websiteHasEcommerce} onCheckedChange={setWebsiteHasEcommerce} />
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+            <div>
+              <p className="text-xs font-medium text-foreground">Blog / Conteúdo</p>
+              <p className="text-2xs text-muted-foreground">Artigos e publicações dinâmicas</p>
+            </div>
+            <Switch checked={websiteHasBlog} onCheckedChange={setWebsiteHasBlog} />
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+            <div>
+              <p className="text-xs font-medium text-foreground">Formulário de captação</p>
+              <p className="text-2xs text-muted-foreground">Leads, contato ou agendamento</p>
+            </div>
+            <Switch checked={websiteHasForm} onCheckedChange={setWebsiteHasForm} />
+          </div>
+        </div>
+      </div>
+
+      {/* CMS (only if blog enabled) */}
+      {websiteHasBlog && (
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-foreground">Sistema de gerenciamento de conteúdo</label>
+          <div className="flex flex-wrap gap-2">
+            {WEBSITE_CMS_OPTIONS.map((cms) => (
+              <button
+                key={cms}
+                onClick={() => setWebsiteCMS(cms)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-2xs font-medium border transition-all",
+                  websiteCMS === cms
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-surface/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                )}
+              >
+                {cms}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Integrações */}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-foreground">Integrações desejadas</label>
+        <div className="flex flex-wrap gap-2">
+          {WEBSITE_INTEGRATIONS.map((integ) => (
+            <button
+              key={integ}
+              onClick={() => toggleIntegration(integ)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-2xs font-medium border transition-all",
+                integrations.includes(integ)
+                  ? "border-accent bg-accent text-accent-foreground"
+                  : "border-border bg-surface/30 text-muted-foreground hover:border-accent/40 hover:text-foreground"
+              )}
+            >
+              {integrations.includes(integ) && <Check className="w-3 h-3 inline mr-1" />}
+              {integ}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex justify-between pt-2">
+        <button
+          onClick={prevStep}
+          className="px-4 py-2 rounded-lg text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all"
+        >
+          ← Voltar
+        </button>
+        <button
+          onClick={handleNext}
+          className={cn(
+            "px-6 py-2 rounded-lg text-xs font-semibold transition-all",
+            "bg-gradient-primary text-primary-foreground hover:shadow-glow",
+            !isValid && "opacity-60"
+          )}
+        >
+          Próximo →
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─── Step 4 — Confirmação (sistema) ──────────────────────────────────────────
 
 const StepConfirmacao = () => {
   const {
@@ -549,10 +945,9 @@ const StepConfirmacao = () => {
         monetization,
         integrations,
         status: "draft",
+        mode: "system",
       },
-      {
-        onSuccess: () => reset(),
-      }
+      { onSuccess: () => reset() }
     );
   };
 
@@ -572,7 +967,6 @@ const StepConfirmacao = () => {
         <p className="text-muted-foreground text-xs">Revise e confirme antes de gerar o projeto.</p>
       </div>
 
-      {/* Título editável */}
       <div className="space-y-1.5">
         <label className="text-xs font-medium text-foreground">Nome do projeto</label>
         <input
@@ -583,7 +977,6 @@ const StepConfirmacao = () => {
         />
       </div>
 
-      {/* Resumo dos dados */}
       <div className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
         <Section label="Tipo" value={PROJECT_TYPES.find(t => t.value === type)?.label ?? type} />
         <Section label="Nicho" value={niche} />
@@ -595,7 +988,6 @@ const StepConfirmacao = () => {
         {integrations.length > 0 && <Section label="Integrações" value={integrations} />}
       </div>
 
-      {/* Ideia resumida */}
       {idea && (
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Ideia original</label>
@@ -639,10 +1031,152 @@ const StepConfirmacao = () => {
               </AnimatePresence>
             </>
           ) : (
+            <><Sparkles className="w-3.5 h-3.5" /> Gerar Projeto</>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─── Step 3b — Confirmação Site ───────────────────────────────────────────────
+
+const StepConfirmacaoSite = () => {
+  const {
+    idea, type, niche,
+    websiteSections, websiteStyle, websiteTone, websiteCMS,
+    websiteHasEcommerce, websiteHasBlog, websiteHasForm,
+    integrations, title, setTitle, prevStep, reset,
+  } = useProjectWizard();
+
+  const { mutate: createProject, isPending } = useCreateProject();
+  const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
+
+  useEffect(() => {
+    if (!isPending) return;
+    const interval = setInterval(() => {
+      setLoadingMsgIdx(i => (i + 1) % LOADING_MESSAGES.length);
+    }, 2200);
+    return () => clearInterval(interval);
+  }, [isPending]);
+
+  const typeLabel = WEBSITE_TYPES.find(t => t.value === type)?.label ?? type;
+  const styleLabel = WEBSITE_STYLES.find(s => s.value === websiteStyle)?.label ?? websiteStyle;
+  const derivedTitle = title || `${niche ? niche + " — " : ""}${typeLabel || "Site"}`;
+
+  const handleCreate = () => {
+    createProject(
+      {
+        title: derivedTitle,
+        original_idea: idea,
+        type,
+        niche,
+        complexity: 2,
+        platform: "Web",
+        audience: "",
+        features: websiteSections,
+        monetization: "",
+        integrations,
+        status: "draft",
+        mode: "website",
+        website_sections: websiteSections,
+        website_style: websiteStyle,
+        website_tone: websiteTone,
+        website_cms: websiteCMS,
+        website_has_ecommerce: websiteHasEcommerce,
+        website_has_blog: websiteHasBlog,
+        website_has_form: websiteHasForm,
+      },
+      { onSuccess: () => reset() }
+    );
+  };
+
+  const Section = ({ label, value }: { label: string; value: string | string[] | boolean }) => (
+    <div className="flex gap-3">
+      <span className="text-2xs text-muted-foreground w-32 flex-shrink-0 pt-0.5">{label}</span>
+      <span className="text-xs text-foreground flex-1">
+        {typeof value === "boolean"
+          ? (value ? "Sim" : "Não")
+          : Array.isArray(value)
+            ? (value.length > 0 ? value.join(", ") : "—")
+            : String(value || "—")}
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="p-8 rounded-xl border border-border bg-card space-y-6">
+      <div>
+        <h2 className="font-display font-semibold text-sm text-foreground mb-1">Confirme os dados do site</h2>
+        <p className="text-muted-foreground text-xs">Revise antes de criar o projeto.</p>
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-foreground">Nome do projeto</label>
+        <input
+          value={title || derivedTitle}
+          onChange={e => setTitle(e.target.value)}
+          placeholder={derivedTitle}
+          className="w-full px-4 py-2.5 rounded-lg text-xs bg-input border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+      </div>
+
+      <div className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
+        <Section label="Tipo de site" value={typeLabel} />
+        <Section label="Nicho" value={niche} />
+        <Section label="Estilo visual" value={styleLabel} />
+        {websiteTone && <Section label="Tom" value={websiteTone} />}
+        {websiteSections.length > 0 && <Section label="Seções" value={websiteSections} />}
+        <Section label="E-commerce" value={websiteHasEcommerce} />
+        <Section label="Blog/CMS" value={websiteHasBlog ? (websiteCMS || "Sim") : false} />
+        <Section label="Formulário" value={websiteHasForm} />
+        {integrations.length > 0 && <Section label="Integrações" value={integrations} />}
+      </div>
+
+      {idea && (
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Descrição do site</label>
+          <p className="text-xs text-foreground leading-relaxed line-clamp-4 bg-muted/20 rounded-lg p-3 border border-border">
+            {idea}
+          </p>
+        </div>
+      )}
+
+      <div className="flex justify-between pt-2">
+        <button
+          onClick={prevStep}
+          disabled={isPending}
+          className="px-4 py-2 rounded-lg text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all disabled:opacity-40"
+        >
+          ← Voltar
+        </button>
+        <button
+          onClick={handleCreate}
+          disabled={isPending}
+          className={cn(
+            "flex items-center gap-2 px-6 py-2.5 rounded-lg text-xs font-semibold transition-all min-w-[160px] justify-center",
+            "bg-gradient-primary text-primary-foreground hover:shadow-glow",
+            "disabled:cursor-not-allowed disabled:shadow-none disabled:opacity-90"
+          )}
+        >
+          {isPending ? (
             <>
-              <Sparkles className="w-3.5 h-3.5" />
-              Gerar Projeto
+              <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={loadingMsgIdx}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.25 }}
+                  className="truncate"
+                >
+                  {LOADING_MESSAGES[loadingMsgIdx]}
+                </motion.span>
+              </AnimatePresence>
             </>
+          ) : (
+            <><Globe className="w-3.5 h-3.5" /> Criar Site</>
           )}
         </button>
       </div>
@@ -653,22 +1187,35 @@ const StepConfirmacao = () => {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const NewProjectPage = () => {
-  const { currentStep, idea, type, niche, audience } = useProjectWizard();
+  const { currentStep, idea, type, niche, audience, mode } = useProjectWizard();
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
-  // Auto-save indicator — triggers whenever wizard state changes
   useEffect(() => {
     if (!idea && !type) return;
     const timer = setTimeout(() => setLastSaved(new Date()), 800);
     return () => clearTimeout(timer);
   }, [idea, type, niche, audience]);
 
-  const stepComponents = [
-    <StepIdeia key="0" />,
-    <StepClassificacao key="1" />,
-    <StepDetalhamento key="2" />,
-    <StepConfirmacao key="3" />,
-  ];
+  // Dynamic step arrays
+  const STEPS_SYSTEM = ["Tipo", "Ideia", "Classificação", "Detalhamento", "Confirmação"];
+  const STEPS_WEBSITE = ["Tipo", "Ideia", "Site", "Confirmação"];
+  const STEPS = mode === "website" ? STEPS_WEBSITE : STEPS_SYSTEM;
+
+  // Step component mapping
+  // System:  0=Modo  1=Ideia  2=Classificacao  3=Detalhamento  4=Confirmacao
+  // Website: 0=Modo  1=Ideia  2=StepSite       3=ConfirmacaoSite
+  const getStepComponent = () => {
+    if (currentStep === 0) return <StepModo key="0" />;
+    if (currentStep === 1) return <StepIdeia key="1" />;
+    if (currentStep === 2) {
+      return mode === "website" ? <StepSite key="2w" /> : <StepClassificacao key="2s" />;
+    }
+    if (currentStep === 3) {
+      return mode === "website" ? <StepConfirmacaoSite key="3w" /> : <StepDetalhamento key="3s" />;
+    }
+    if (currentStep === 4) return <StepConfirmacao key="4" />;
+    return null;
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -689,7 +1236,9 @@ const NewProjectPage = () => {
       <div>
         <h1 className="font-display font-bold text-xl text-foreground">Novo Projeto</h1>
         <p className="text-muted-foreground text-xs mt-0.5">
-          Descreva sua ideia e a IA irá estruturar o projeto completo para você.
+          {mode === "website"
+            ? "Descreva o site e a IA vai estruturar páginas, copy, SEO e prompts prontos."
+            : "Descreva sua ideia e a IA irá estruturar o projeto completo para você."}
         </p>
       </div>
 
@@ -697,10 +1246,7 @@ const NewProjectPage = () => {
       <div className="flex items-center gap-0">
         {STEPS.map((step, i) => (
           <div key={step} className="flex items-center flex-1">
-            <div className={cn(
-              "flex items-center gap-1.5 flex-1",
-              i < currentStep ? "opacity-60" : ""
-            )}>
+            <div className={cn("flex items-center gap-1.5 flex-1", i < currentStep ? "opacity-60" : "")}>
               <div className={cn(
                 "w-6 h-6 rounded-full flex items-center justify-center text-2xs font-bold border-2 transition-all flex-shrink-0",
                 i < currentStep
@@ -737,7 +1283,7 @@ const NewProjectPage = () => {
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.25 }}
         >
-          {stepComponents[currentStep]}
+          {getStepComponent()}
         </motion.div>
       </AnimatePresence>
     </div>

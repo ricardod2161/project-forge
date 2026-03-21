@@ -7,7 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-type ContentType = "modules" | "screens" | "database" | "rules";
+type ContentType = "modules" | "screens" | "database" | "rules"
+  | "site_pages" | "site_copy" | "site_seo" | "site_structure";
 
 const contentInstructions: Record<ContentType, string> = {
   modules: `Liste e descreva todos os módulos do sistema em formato Markdown estruturado.
@@ -80,13 +81,101 @@ Categorias obrigatórias:
 8. Performance e Escalabilidade
 
 Seja extremamente específico e acionável — estas regras serão implementadas diretamente por desenvolvedores.`,
+
+  site_pages: `Liste e descreva todas as páginas e seções do site.
+Para cada página principal:
+- Nome e rota sugerida (/contato, /servicos, etc.)
+- Objetivo da página (converter, informar, apresentar)
+- Seções internas em ordem hierárquica
+- Componentes de UI de cada seção (nomes específicos e visuais)
+- Conteúdo placeholder realista para o nicho
+- CTA principal e SEO H1 sugerido
+
+Para cada seção das escolhidas pelo usuário:
+- Layout (grid, full-width, split, etc.)
+- Elementos visuais (imagens, ícones, vídeo, background)
+- Textos: headline, subheadline, CTA
+- Animação sugerida (fade, slide, parallax)
+- Diferença mobile vs desktop
+
+Mínimo 8 páginas/seções. Incluir Header e Footer globais.`,
+
+  site_copy: `Gere o copywriting profissional completo para o site em Markdown.
+Estruturar pelas seções escolhidas pelo usuário.
+
+Para cada seção:
+
+## Seção: [Nome]
+
+Headline principal:
+Subheadline:
+Corpo (2-3 parágrafos):
+CTA primário:
+CTA secundário:
+Microcopy (labels, placeholders):
+
+Usar o tom de comunicação especificado. Linguagem persuasiva baseada em benefícios.
+Incluir variações A/B para headline do Hero.
+Meta title e meta description de SEO para cada página principal.`,
+
+  site_seo: `Estratégia SEO completa para o site em Markdown estruturado.
+
+## Palavras-chave
+
+- Primárias (volume alto, específicas do nicho)
+- Long-tail (intenção de compra/contato)
+- Mapeamento: keyword principal por página
+
+## Meta Tags por Página
+
+Title (max 60 chars) e Description (max 155 chars) para cada página
+
+## Schema Markup
+
+JSON-LD para o tipo de negócio (LocalBusiness/Organization/Person/Product)
+
+## Sitemap Sugerido
+
+Hierarquia de URLs amigáveis
+
+## Checklist Técnico
+
+- H1 único por página, alt text em imagens, canonical, sitemap.xml,
+  robots.txt, HTTPS, mobile-friendly, Core Web Vitals dentro do limite,
+  Open Graph e Twitter Cards configurados`,
+
+  site_structure: `Arquitetura técnica completa do site em Markdown.
+
+## Stack Técnica Recomendada
+
+Justificativa para cada escolha considerando tipo, complexidade, CMS.
+
+## Estrutura de Pastas
+
+Árvore completa com comentários em cada pasta.
+
+## Componentes Principais
+
+Lista de componentes com props (TypeScript), responsabilidade e onde é usado.
+
+## Dados e Estado
+
+Estático vs dinâmico, integração CMS, cache e revalidação.
+
+## Configuração de Build e Deploy
+
+Configuração vite.config.ts, variáveis de ambiente, domínio e DNS, headers de segurança, preview URLs.`,
 };
 
 const modelForContentType: Record<ContentType, string> = {
-  modules:  "google/gemini-2.5-flash",
-  screens:  "google/gemini-2.5-flash",
-  database: "google/gemini-2.5-flash",
-  rules:    "google/gemini-2.5-flash",
+  modules:        "google/gemini-2.5-flash",
+  screens:        "google/gemini-2.5-flash",
+  database:       "google/gemini-2.5-flash",
+  rules:          "google/gemini-2.5-flash",
+  site_pages:     "google/gemini-2.5-flash",
+  site_copy:      "google/gemini-2.5-flash",
+  site_seo:       "google/gemini-2.5-flash",
+  site_structure: "google/gemini-2.5-flash",
 };
 
 serve(async (req) => {
@@ -143,7 +232,30 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurado");
 
-    const systemPrompt = `Você é um arquiteto de software sênior com 20 anos de experiência construindo sistemas SaaS complexos.
+    // Detect website and build context
+    const isWebsite = (project.metadata as Record<string, unknown>)?.mode === "website";
+    const websiteMeta = (project.metadata as Record<string, unknown>) ?? {};
+
+    const websiteContext = isWebsite ? `
+
+**Dados do site:**
+Tipo de site: ${websiteMeta.website_type ?? project.type}
+Estilo visual: ${websiteMeta.website_style ?? "Não definido"}
+Tom: ${websiteMeta.website_tone ?? "Não definido"}
+Seções: ${(websiteMeta.website_sections as string[] ?? []).join(", ") || "Não definidas"}
+E-commerce: ${websiteMeta.website_has_ecommerce ? "sim" : "não"}
+Blog/CMS: ${websiteMeta.website_has_blog ? (websiteMeta.website_cms ?? "sim") : "não"}
+Formulário: ${websiteMeta.website_has_form ? "sim" : "não"}
+` : "";
+
+    const systemPrompt = isWebsite
+      ? `Você é um especialista em criação de sites modernos, com profundo conhecimento em design, copywriting, SEO e performance web.
+Você documenta sites com precisão técnica, especificidade de domínio e clareza acionável.
+Responda sempre em Markdown bem estruturado com hierarquia clara de headings (##, ###).
+Seja profundamente específico para o nicho, tipo e estilo visual do site descrito.
+NUNCA use exemplos genéricos. Use terminologia técnica correta do domínio.
+Linguagem: português brasileiro técnico-profissional.`
+      : `Você é um arquiteto de software sênior com 20 anos de experiência construindo sistemas SaaS complexos.
 Você documenta sistemas com precisão técnica, especificidade de domínio e clareza acionável.
 Responda sempre em Markdown bem estruturado com hierarquia clara de headings (##, ###).
 Seja profundamente específico para o nicho, tipo e público-alvo do projeto descrito.
@@ -163,7 +275,7 @@ Linguagem: português brasileiro técnico-profissional.`;
 **Funcionalidades listadas:** ${(project.features ?? []).join(", ") || "Nenhuma"}
 **Integrações:** ${(project.integrations ?? []).join(", ") || "Nenhuma"}
 **Monetização:** ${project.monetization ?? "Não definida"}
-
+${websiteContext}
 Gere documentação profissional, completa e altamente específica para este projeto.`;
 
     const selectedModel = modelForContentType[content_type];
