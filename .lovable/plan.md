@@ -1,147 +1,88 @@
 
-## Auditoria completa — Bugs identificados e correções
+## Funcionalidade: Aprovar e Aplicar Findings da Revisão IA
 
-### Análise da screenshot + código (2036 linhas)
+### O que o usuário quer
+Na aba "Revisão IA", cada finding (crítico, importante, sugestão) deve ter ações:
+- **Aprovar/Aplicar melhoria** — a IA usa a recomendação do finding para atualizar os campos reais do projeto (audience, features, description, monetization, etc.)
+- **Dispensar** — marcar o finding como ignorado (não volta na próxima análise)
+- Contador de resolvidos no summary bar
 
-Analisando a tela e o código completo, encontrei **8 bugs reais** e **5 problemas de UX** que afetam o funcionamento:
+### Arquitetura
 
----
+**1. Estado local de findings com status**
+Estender `Finding` com campo `status?: "pending" | "applied" | "dismissed"` — gerenciado em `useState` no `AIReviewTab`.
 
-### BUG 1 — `handleDuplicate` em conflito com `useDuplicateProject` (duplicação falha silenciosamente)
+**2. Ação "Aplicar" — nova Edge Function `apply-finding`**
+Cria `supabase/functions/apply-finding/index.ts`:
+- Recebe `{ project_id, finding: { title, description, recommendation, category } }`
+- Busca projeto do banco
+- Chama `callLovableAI` com o contexto do projeto + o finding específico
+- Pede à IA: *"Com base nesta recomendação, sugira os campos exatos do projeto para atualizar (JSON com os campos do projeto)"*
+- Retorna `{ updates: Partial<Project> }` com apenas os campos alterados (ex: `{ audience: "novo valor", features: [...] }`)
+- O frontend aplica via `useUpdateProject`
 
-**Problema**: O `ProjectDetailPage` tem um `handleDuplicate` *inline* que faz `supabase.from("projects").insert(...)` diretamente, enquanto o `useProjects.ts` já tem um hook `useDuplicateProject()` com lógica completa (slugify, invalidação de cache, navegação). O inline não usa `slugify()` — passa um slug com timestamp bruto que pode violar a constraint unique do banco. Quando há erro de slug duplicado, o `toast.error` dispara mas o usuário fica na mesma página.
+**3. Ação "Dispensar"**
+Apenas atualiza o estado local — sem chamada ao backend. O finding recebe `status: "dismissed"` e fica visualmente riscado/opaco.
 
-**Correção**: Substituir o `handleDuplicate` inline pelo hook `useDuplicateProject` já existente em `useProjects.ts`.
+**4. Visual nos cards de finding**
+Cada card ganha dois botões no rodapé:
+- `Aplicar` (botão primário pequeno com ícone `Wand2`) — chama a edge function → atualiza projeto → finding fica `applied` com check verde
+- `Dispensar` (botão ghost com ícone `X`) — marca como `dismissed`, aparece riscado
 
----
+**5. Summary bar atualizado**
+- Adicionar contador `{aplicados} de {total} resolvidos`
+- Progress bar mini mostrando progresso de resolução
+- Badge verde quando todos estão resolvidos: "Tudo revisado ✓"
 
-### BUG 2 — `PromptsTab`: `selectedType` não sincroniza quando `isWebsite` muda
+**6. Estado de loading por finding**
+`applyingId: string | null` — enquanto um finding está sendo aplicado, mostra spinner naquele card específico (não trava os outros).
 
-**Problema**: `selectedType` é inicializado via `useState(() => isWebsite ? "site_master" : "master")`. O estado é inicializado **uma única vez** — se o componente for remontado com um `isWebsite` diferente, o `selectedType` vai continuar com o valor antigo. Por exemplo: se um projeto for de sistema e o usuário navegar para um de site, o selectedType ainda é `"master"` mas a `activeTypesList` vai ser `WEBSITE_PROMPT_TYPES_LIST`, quebrando o lookup de `currentTypeMeta`.
+### Arquivos alterados
 
-**Correção**: Adicionar `useEffect` que reseta `selectedType` quando `isWebsite` muda:
-```typescript
-useEffect(() => {
-  setSelectedType(isWebsite ? "site_master" : "master");
-}, [isWebsite]);
+1. **`supabase/functions/apply-finding/index.ts`** — nova edge function
+2. **`src/pages/app/ProjectDetailPage.tsx`** — `AIReviewTab` com botões + estados, `Finding` interface estendida, `AIReviewTab` recebe `onProjectUpdate` callback do pai
+
+### Detalhes técnicos
+
+**`apply-finding` edge function — lógica da IA:**
+```
+System: "Você é um assistente que atualiza campos de projetos de software. 
+Dado um projeto e uma recomendação específica, retorne APENAS um JSON com os campos 
+do projeto que devem ser atualizados. Campos disponíveis: description, audience, 
+features (array), monetization, integrations (array), platform, complexity (1-5)."
+
+User: "Projeto: [contexto]
+Finding: [titulo + recomendação]
+Retorne JSON com apenas os campos a atualizar."
 ```
 
----
-
-### BUG 3 — `AIContentTabWrapper`: `contentType` não inclui `"screens"` no union type
-
-**Problema**: O tipo declarado em `AIContentTabWrapper` é:
+**Interface `FindingWithStatus`:**
 ```typescript
-contentType: "modules" | "database" | "rules" | "site_pages" | "site_copy" | "site_seo" | "site_structure";
+interface FindingWithStatus extends Finding {
+  status: "pending" | "applying" | "applied" | "dismissed";
+  appliedFields?: string[]; // campos que foram atualizados
+}
 ```
-`"screens"` está **faltando**. O `ScreensTabWrapper` chama `onContentGenerated("screens", ...)` e o `aiContentCache["screens"]` é lido na linha 1765, mas se alguém passar `contentType="screens"` para `AIContentTabWrapper`, o TypeScript vai reclamar (não um crash mas uma inconsistência de tipo).
 
-**Correção**: Adicionar `"screens"` ao union type do `contentType`.
-
----
-
-### BUG 4 — `tabHasContent["versions"]` sempre `true` — dot aparece mesmo sem versões
-
-**Problema**: Na linha 1756:
-```typescript
-versions: true,
+**Fluxo no componente:**
 ```
-O dot verde de "tem conteúdo" aparece sempre na aba Versões, mesmo quando o projeto não tem nenhuma versão registrada. Isso é enganoso.
-
-**Correção**: Precisaria do `useProjectVersions` no nível do `ProjectDetailPage`. A solução mais simples (sem nova query) é deixar `false` como padrão e atualizar após a query no `VersionsTab`. Mas como a query está encapsulada no componente filho, a solução correta é mover a query `useProjectVersions` para o pai assim como já foi feito para `useProjectPrompts`. Alternativamente: definir `versions: false` para não enganar o usuário.
-
-**Correção**: `versions: false` (remove o dot enganoso).
-
----
-
-### BUG 5 — `EvalTab` perde o `cachedResult` quando o componente remonta por `AnimatePresence`
-
-**Problema**: O `EvalTab` recebe `cachedResult` como prop e usa `useState(cachedResult)` para inicializar. Mas o `AnimatePresence` com `mode="wait"` **desmonta e remonta** o componente a cada troca de aba. Quando o usuário volta para a aba `eval`, o componente remonta com `useState(cachedResult)` — mas o `cachedResult` do pai é `null` na primeira renderização após a remontagem porque o estado do pai (`evalResultCache`) é passado como prop estática no momento da montagem. 
-
-**Análise mais profunda**: Na verdade isso JÁ está correto — o pai tem `evalResultCache` e passa como prop, então quando o usuário volta para a aba `eval`, o componente remonta com `useState(evalResultCache)` que tem o valor correto. **Este bug NÃO existe** — a implementação está correta. ✓
-
----
-
-### BUG 6 — `generate-prompt/index.ts` linha ~1321: template literal não fecha corretamente
-
-**Verificado nas linhas 1400-1474**: O arquivo funciona. O bug de backtick já foi corrigido na sessão anterior. **Sem bug aqui.** ✓
-
----
-
-### BUG 7 — Título do projeto: "Agência — Agência / Freela" (redundância no title gerado)
-
-**Problema (visível na screenshot)**: O projeto mostra título `"Agência — Agência / Freela"`. Isso ocorre porque o `useProjectWizard` gera o título concatenando tipo e nicho. No wizard, o usuário escolheu `type="Agência"` e `niche="Agência / Freela"`, resultando em `"Agência — Agência / Freela"`. 
-
-**Correção no `useProjectWizard.ts`**: Verificar se o `title` gerado já contém o niche antes de concatenar, ou verificar se type e niche são idênticos/similares.
-
----
-
-### BUG 8 — `VersionsTab`: `nextVersion` calculado com base em `versions.length` é incorreto
-
-**Problema**: Na linha 1113:
-```typescript
-const nextVersion = (versions?.length ?? 0) + 1;
+handleApply(index) → setFindings com status "applying" → 
+invoke("apply-finding") → 
+onSuccess: updateProject.mutate(updates) + setFindings status "applied" + toast
+onError: setFindings status "pending" + toast.error
 ```
-Se o usuário deletou versões intermediárias (ex: v1 e v3 existem, v2 foi deletada), `versions.length` seria 2, mas o próximo número deveria ser 4. Isso cria números duplicados no banco.
 
-**Correção**: Calcular com `Math.max(...versions.map(v => v.version_number), 0) + 1`.
-
----
-
-### BUG 9 — `generate-ai-content`: sem `"screens"` no union type `ContentType`
-
-**Analisado**: `ContentType` em `generate-ai-content/index.ts` inclui explicitamente:
-```typescript
-type ContentType = "modules" | "screens" | "database" | "rules" | "site_pages" | "site_copy" | "site_seo" | "site_structure";
+**Callsite no pai:**
+```tsx
+{activeTab === "ai" && (
+  <AIReviewTab 
+    projectId={project.id}
+    onProjectUpdate={(updates) => updateProject.mutate({ ...updates, _silent: true })}
+  />
+)}
 ```
-`"screens"` está **presente** aqui. ✓ Mas `"screens"` não está em `contentInstructions` — apenas `screens` está nas instruções. ✓ Tudo OK.
 
----
-
-### BUG 10 — `useProjectWizard.ts`: lógica de geração de título com niche redundante
-
-**Verificar**: preciso ver o arquivo antes de confirmar.
-
----
-
-### PROBLEMA UX 1 — Scroll duplo: `window.scrollTo` na troca de aba dentro de AppLayout com scroll próprio
-
-**Problema**: O `useEffect` que chama `window.scrollTo({ top: 0 })` na troca de aba pode não funcionar se o scroll estiver no container do `AppLayout` e não no `window`. Isso resulta em a página não subir ao trocar de aba.
-
-**Correção**: Usar `document.querySelector('[data-scroll-container]')?.scrollTo(...)` ou checar como o `AppLayout` está configurado.
-
----
-
-### PROBLEMA UX 2 — Tab "Copy" na screenshot está selecionada mas conteúdo parece vazio
-
-**Visível na screenshot**: A aba "Copy" está ativa mas a área abaixo mostra apenas o ícone de arquivo vazio. Isso indica que `aiContentCache["site_copy"]` está `null` e o componente mostra estado vazio. **Comportamento correto** — não é bug, é UX esperada.
-
----
-
-## Plano de Correções — Arquivo por arquivo
-
-### `src/pages/app/ProjectDetailPage.tsx`
-
-**Correção 1**: Usar `useDuplicateProject` hook em vez do `handleDuplicate` inline  
-**Correção 2**: Adicionar `useEffect` de sincronização do `selectedType` no `PromptsTab`  
-**Correção 3**: Adicionar `"screens"` ao union type de `contentType` em `AIContentTabWrapper`  
-**Correção 4**: `tabHasContent.versions: false` (não `true`)  
-**Correção 5**: Fix do `nextVersion` em `VersionsTab` com `Math.max`  
-**Correção 6**: Scroll ao trocar aba — usar `ref` no container em vez de `window.scrollTo`
-
-### `src/hooks/useProjectWizard.ts`
-
-**Correção 7**: Evitar título redundante quando type e niche são similares
-
-### `src/pages/app/ProjectDetailPage.tsx` — Melhorias de robustez
-
-**Correção 8**: `PromptsTab` — sincronizar `selectedType` com `isWebsite` via `useEffect`  
-**Correção 9**: Error boundary leve no `AIContentTabWrapper` para catches silenciosos
-
----
-
-## Arquivos alterados
-1. `src/pages/app/ProjectDetailPage.tsx` — bugs 1, 2, 3, 4, 5, 6  
-2. `src/hooks/useProjectWizard.ts` — bug 7 (título redundante)
-
-Nenhuma alteração em Edge Functions (estão funcionando corretamente após o fix anterior de backtick).
+### O que NÃO muda
+- Edge function `review-project` — intocada
+- Banco de dados — sem migration necessária (usa o `updateProject` existente)
+- Nenhuma outra aba afetada
