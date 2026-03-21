@@ -89,6 +89,7 @@ export function useProjectMetrics() {
       const projects = projectsRes.data ?? [];
       const totalProjects = projects.length;
       const activeProjects = projects.filter((p) => p.status === "active").length;
+      const favoriteProjects = projects.filter((p) => (p as { is_favorite: boolean }).is_favorite).length;
       const totalPrompts = promptsRes.count ?? 0;
 
       const scored = projects.filter((p) => p.quality_score !== null);
@@ -97,7 +98,7 @@ export function useProjectMetrics() {
           ? Math.round(scored.reduce((sum, p) => sum + (p.quality_score ?? 0), 0) / scored.length)
           : null;
 
-      return { totalProjects, activeProjects, totalPrompts, avgScore };
+      return { totalProjects, activeProjects, favoriteProjects, totalPrompts, avgScore };
     },
   });
 }
