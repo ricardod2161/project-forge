@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Star, MoreHorizontal, Zap, Calendar, Archive, Eye, StarOff, ArrowRight } from "lucide-react";
+import { Star, MoreHorizontal, Zap, Calendar, Archive, Eye, StarOff, ArrowRight, Copy } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useToggleFavorite } from "@/hooks/useProjects";
+import { useToggleFavorite, useDuplicateProject } from "@/hooks/useProjects";
 import { useUpdateProject } from "@/hooks/useProjectDetail";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -40,6 +40,7 @@ const ProjectCard = ({
   const statusInfo = statusConfig[status] ?? statusConfig.draft;
   const toggleFavorite = useToggleFavorite();
   const updateProject = useUpdateProject(id);
+  const duplicateProject = useDuplicateProject();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -63,16 +64,13 @@ const ProjectCard = ({
         "flex flex-col"
       )}
     >
-      {/* Top color accent strip for score */}
       {score !== undefined && (
         <div className={cn("h-0.5 rounded-t-xl", scoreBg(score))} style={{ width: `${score}%` }} />
       )}
 
       <div className="flex flex-col gap-3.5 p-4 flex-1">
-        {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            {/* Badges */}
             <div className="flex items-center gap-1.5 mb-2 flex-wrap">
               <span className={cn("px-2 py-0.5 rounded-full text-2xs font-semibold border", statusInfo.classes)}>
                 {statusInfo.label}
@@ -83,7 +81,6 @@ const ProjectCard = ({
                 </span>
               )}
             </div>
-            {/* Title — always readable */}
             <Link to={`/app/projetos/${id}`}>
               <h3 className={cn(
                 "font-display font-semibold text-xs text-foreground leading-snug",
@@ -95,7 +92,6 @@ const ProjectCard = ({
             </Link>
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-0.5 flex-shrink-0">
             <button
               onClick={handleFavorite}
@@ -115,10 +111,14 @@ const ProjectCard = ({
                   <MoreHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem onClick={() => navigate(`/app/projetos/${id}`)}>
                   <Eye className="w-3.5 h-3.5 mr-2" />
                   Ver detalhes
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => duplicateProject.mutate(id)}>
+                  <Copy className="w-3.5 h-3.5 mr-2" />
+                  Duplicar projeto
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleArchive}>
@@ -130,14 +130,12 @@ const ProjectCard = ({
           </div>
         </div>
 
-        {/* Description */}
         {description && (
           <p className="text-2xs text-muted-foreground line-clamp-2 leading-relaxed">
             {description}
           </p>
         )}
 
-        {/* Score bar */}
         {score !== undefined && (
           <div className="flex items-center gap-2">
             <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
@@ -155,7 +153,6 @@ const ProjectCard = ({
         )}
       </div>
 
-      {/* Footer — always visible, not hidden until hover */}
       <div className="flex items-center justify-between px-4 py-3 border-t border-border/60">
         <div className="flex items-center gap-3 text-2xs text-muted-foreground">
           {promptsCount > 0 && (
