@@ -927,9 +927,15 @@ const StepConfirmacao = () => {
     return () => clearInterval(interval);
   }, [isPending]);
 
-  const derivedTitle = title || `${niche ? niche + " — " : ""}${
-    PROJECT_TYPES.find((t) => t.value === type)?.label ?? "Projeto"
-  }`;
+  // BUG 7 FIX: avoid redundant title like "Agência — Agência / Freela"
+  // Only prepend niche if it's meaningfully different from the type label
+  const typeLabel930 = PROJECT_TYPES.find((t) => t.value === type)?.label ?? "Projeto";
+  const nicheNorm = (niche ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const typeNorm = typeLabel930.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const nichePrefix = niche && !nicheNorm.startsWith(typeNorm) && !typeNorm.startsWith(nicheNorm)
+    ? `${niche} — `
+    : "";
+  const derivedTitle = title || `${nichePrefix}${typeLabel930}`;
 
   const handleCreate = () => {
     createProject(
