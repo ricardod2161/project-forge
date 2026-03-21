@@ -165,6 +165,31 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* Como Funciona */}
+      <section className="py-24 px-6 bg-surface/30">
+        <div className="container max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="font-display font-bold text-xl md:text-2xl mb-4">
+              Como funciona em <span className="text-gradient">3 passos</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {howItWorks.map((step, i) => (
+              <motion.div key={step.step} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: i * 0.15 }} viewport={{ once: true }}
+                className="flex flex-col items-center text-center">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 shadow-glow">
+                  <span className="font-display font-bold text-primary text-lg">{step.step}</span>
+                </div>
+                {i < 2 && <div className="hidden md:block absolute mt-7 ml-48 w-16 h-px bg-border" />}
+                <h3 className="font-display font-semibold text-sm mb-2">{step.title}</h3>
+                <p className="text-muted-foreground text-xs leading-relaxed">{step.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Funcionalidades */}
       <section id="funcionalidades" className="py-24 px-6">
         <div className="container max-w-6xl mx-auto">
