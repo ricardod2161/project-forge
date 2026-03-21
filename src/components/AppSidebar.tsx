@@ -26,6 +26,11 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -43,21 +48,54 @@ const bottomItems = [
   { title: "Planos", url: "/app/planos", icon: CreditCard },
 ];
 
+const NavItem = ({
+  item,
+  collapsed,
+  activeClassName,
+}: {
+  item: typeof navItems[0];
+  collapsed: boolean;
+  activeClassName: string;
+}) => {
+  const content = (
+    <NavLink
+      to={item.url}
+      end={"end" in item ? item.end : undefined}
+      className={cn(
+        "flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150",
+        "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent",
+        collapsed && "justify-center px-2"
+      )}
+      activeClassName={activeClassName}
+    >
+      <item.icon className="w-4 h-4 flex-shrink-0" />
+      {!collapsed && <span>{item.title}</span>}
+    </NavLink>
+  );
+
+  if (collapsed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{content}</TooltipTrigger>
+        <TooltipContent side="right" className="text-xs">
+          {item.title}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return content;
+};
+
 const AppSidebar = () => {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
-
-  const isActive = (url: string, end = false) => {
-    if (end) return location.pathname === url;
-    return location.pathname.startsWith(url);
-  };
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       {/* Logo */}
-      <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
-        <NavLink to="/app" className="flex items-center gap-2.5 group">
+      <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
+        <NavLink to="/app" className={cn("flex items-center gap-2.5 group", collapsed && "justify-center")}>
           <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center flex-shrink-0 shadow-glow">
             <Sparkles className="w-4 h-4 text-primary-foreground" />
           </div>
@@ -70,9 +108,21 @@ const AppSidebar = () => {
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-3">
-        {/* Ação rápida: Novo Projeto */}
-        {!collapsed && (
-          <div className="px-2 mb-3">
+        {/* Novo Projeto — both expanded and collapsed */}
+        <div className={cn("mb-3", collapsed ? "px-1" : "px-2")}>
+          {collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <NavLink
+                  to="/app/projetos/novo"
+                  className="flex items-center justify-center w-full p-2 rounded-lg bg-gradient-primary text-primary-foreground hover:shadow-glow transition-all duration-200 hover:scale-[1.05]"
+                >
+                  <Plus className="w-4 h-4" />
+                </NavLink>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-xs">Novo Projeto</TooltipContent>
+            </Tooltip>
+          ) : (
             <NavLink
               to="/app/projetos/novo"
               className={cn(
@@ -85,8 +135,8 @@ const AppSidebar = () => {
               <Plus className="w-4 h-4 flex-shrink-0" />
               <span>Novo Projeto</span>
             </NavLink>
-          </div>
-        )}
+          )}
+        </div>
 
         <SidebarGroup>
           {!collapsed && (
@@ -99,18 +149,11 @@ const AppSidebar = () => {
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.end}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150",
-                        "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-                      )}
-                      activeClassName="bg-sidebar-accent text-sidebar-primary font-semibold border-glow"
-                    >
-                      <item.icon className="w-4 h-4 flex-shrink-0" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
+                    <NavItem
+                      item={item}
+                      collapsed={collapsed}
+                      activeClassName="bg-sidebar-accent text-sidebar-primary font-semibold"
+                    />
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -125,17 +168,11 @@ const AppSidebar = () => {
           {bottomItems.map((item) => (
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton asChild>
-                <NavLink
-                  to={item.url}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150",
-                    "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-                  )}
+                <NavItem
+                  item={item}
+                  collapsed={collapsed}
                   activeClassName="bg-sidebar-accent text-sidebar-primary font-semibold"
-                >
-                  <item.icon className="w-4 h-4 flex-shrink-0" />
-                  {!collapsed && <span>{item.title}</span>}
-                </NavLink>
+                />
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}

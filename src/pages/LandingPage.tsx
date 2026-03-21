@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowRight, Sparkles, Zap, BarChart3, BookTemplate, CheckCircle, Star, ChevronDown } from "lucide-react";
+import { ArrowRight, Sparkles, Zap, BarChart3, BookTemplate, CheckCircle, Star, ChevronDown, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -36,31 +36,31 @@ const faqs = [
 const FAQItem = ({ q, a }: { q: string; a: string }) => {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border border-border rounded-xl overflow-hidden">
+    <div className="border border-border rounded-xl overflow-hidden transition-all">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between p-5 text-left hover:bg-surface/50 transition-colors"
+        className="w-full flex items-center justify-between p-5 text-left hover:bg-surface/50 transition-colors group"
+        aria-expanded={open}
       >
-        <span className="text-sm font-medium text-foreground pr-4">{q}</span>
+        <span className="text-xs font-semibold text-foreground pr-4 leading-relaxed">{q}</span>
         <ChevronDown className={cn("w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform duration-200", open && "rotate-180")} />
       </button>
       <motion.div
         initial={false}
         animate={{ height: open ? "auto" : 0, opacity: open ? 1 : 0 }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.22, ease: "easeOut" }}
         className="overflow-hidden"
       >
-        <p className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed">{a}</p>
+        <p className="px-5 pb-5 text-xs text-muted-foreground leading-relaxed">{a}</p>
       </motion.div>
     </div>
   );
 };
 
 const LandingPage = () => {
-
   return (
     <div className="min-h-screen bg-background text-foreground overflow-hidden">
-      {/* Header */}
+      {/* ── Header ── */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-sm">
         <div className="container max-w-6xl mx-auto flex items-center justify-between h-16 px-6">
           <div className="flex items-center gap-2">
@@ -71,19 +71,20 @@ const LandingPage = () => {
               Arquiteto <span className="text-gradient">IA</span>
             </span>
           </div>
-          <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
+          <nav className="hidden md:flex items-center gap-6 text-xs text-muted-foreground">
             <a href="#funcionalidades" className="hover:text-foreground transition-colors">Funcionalidades</a>
+            <a href="#como-funciona" className="hover:text-foreground transition-colors">Como funciona</a>
             <a href="#planos" className="hover:text-foreground transition-colors">Planos</a>
             <a href="#faq" className="hover:text-foreground transition-colors">FAQ</a>
           </nav>
           <div className="flex items-center gap-3">
-            <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link to="/login" className="text-xs text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
               Entrar
             </Link>
             <Link
               to="/cadastro"
               className={cn(
-                "px-4 py-2 rounded-lg text-sm font-medium",
+                "px-4 py-2 rounded-lg text-xs font-semibold",
                 "bg-gradient-primary text-primary-foreground",
                 "hover:shadow-glow transition-all duration-200"
               )}
@@ -94,18 +95,13 @@ const LandingPage = () => {
         </div>
       </header>
 
-      {/* Hero */}
+      {/* ── Hero ── */}
       <section className="relative min-h-screen flex items-center justify-center pt-16">
-        {/* Grade de pontos animada */}
         <div className="absolute inset-0 dot-grid opacity-40" />
         <div className="absolute inset-0 bg-gradient-radial-primary" />
 
         <div className="relative container max-w-4xl mx-auto text-center px-6 py-24">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <span className={cn(
               "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium mb-8",
               "bg-primary/10 border border-primary/20 text-primary"
@@ -126,7 +122,7 @@ const LandingPage = () => {
           </motion.h1>
 
           <motion.p
-            className="text-base text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed"
+            className="text-xs text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
@@ -143,7 +139,7 @@ const LandingPage = () => {
             <Link
               to="/cadastro"
               className={cn(
-                "flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold",
+                "flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-semibold",
                 "bg-gradient-primary text-primary-foreground",
                 "hover:shadow-glow-lg transition-all duration-300 hover:scale-105 active:scale-100"
               )}
@@ -154,7 +150,7 @@ const LandingPage = () => {
             <a
               href="#funcionalidades"
               className={cn(
-                "flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium",
+                "flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-medium",
                 "border border-border text-foreground",
                 "hover:border-primary/50 hover:bg-surface transition-all duration-200"
               )}
@@ -162,37 +158,64 @@ const LandingPage = () => {
               Ver funcionalidades
             </a>
           </motion.div>
+
+          {/* Social proof */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.7 }}
+            className="mt-12 flex flex-wrap items-center justify-center gap-6 text-2xs text-muted-foreground"
+          >
+            {["Grátis para começar", "Sem cartão de crédito", "Cancele quando quiser"].map(t => (
+              <span key={t} className="flex items-center gap-1.5">
+                <CheckCircle className="w-3.5 h-3.5 text-success" />
+                {t}
+              </span>
+            ))}
+          </motion.div>
         </div>
       </section>
 
-      {/* Como Funciona */}
-      <section className="py-24 px-6 bg-surface/30">
+      {/* ── Como Funciona ── */}
+      <section id="como-funciona" className="py-24 px-6 bg-surface/30">
         <div className="container max-w-5xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="font-display font-bold text-xl md:text-2xl mb-4">
               Como funciona em <span className="text-gradient">3 passos</span>
             </h2>
+            <p className="text-xs text-muted-foreground">Do conceito ao sistema em minutos, sem complicação.</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+
+          {/* Steps with proper connectors using flex layout */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-0 md:gap-0">
             {howItWorks.map((step, i) => (
-              <motion.div key={step.step} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: i * 0.15 }} viewport={{ once: true }}
-                className="flex flex-col items-center text-center relative">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 shadow-glow">
-                  <span className="font-display font-bold text-primary text-lg">{step.step}</span>
-                </div>
-                {i < 2 && (
-                  <div className="hidden md:block absolute left-full top-7 w-8 h-px bg-border -translate-x-4" />
+              <div key={step.step} className="flex flex-col md:flex-row items-stretch">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: i * 0.15 }}
+                  viewport={{ once: true }}
+                  className="flex flex-col items-center text-center flex-1 px-6"
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 shadow-glow">
+                    <span className="font-display font-bold text-primary text-sm">{step.step}</span>
+                  </div>
+                  <h3 className="font-display font-semibold text-xs mb-2">{step.title}</h3>
+                  <p className="text-muted-foreground text-2xs leading-relaxed">{step.desc}</p>
+                </motion.div>
+                {/* Arrow connector between steps — purely decorative, no absolute positioning */}
+                {i < howItWorks.length - 1 && (
+                  <div className="hidden md:flex items-center justify-center flex-shrink-0 w-8 self-start mt-7">
+                    <ArrowRight className="w-4 h-4 text-border" />
+                  </div>
                 )}
-                <h3 className="font-display font-semibold text-sm mb-2">{step.title}</h3>
-                <p className="text-muted-foreground text-xs leading-relaxed">{step.desc}</p>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Funcionalidades */}
+      {/* ── Funcionalidades ── */}
       <section id="funcionalidades" className="py-24 px-6">
         <div className="container max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -200,7 +223,7 @@ const LandingPage = () => {
               Tudo que você precisa para{" "}
               <span className="text-gradient">arquitetar software</span>
             </h2>
-            <p className="text-muted-foreground max-w-xl mx-auto">
+            <p className="text-xs text-muted-foreground max-w-xl mx-auto">
               Uma plataforma completa com IA especializada em cada etapa do processo.
             </p>
           </div>
@@ -209,41 +232,42 @@ const LandingPage = () => {
               <motion.div
                 key={f.title}
                 className={cn(
-                  "p-6 rounded-xl border border-border glass-card",
+                  "p-6 rounded-xl border border-border bg-card",
                   "hover:border-primary/30 hover:shadow-glow transition-all duration-300 group"
                 )}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: i * 0.1 }}
+                transition={{ duration: 0.4, delay: i * 0.08 }}
                 viewport={{ once: true }}
               >
-                <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
                   <f.icon className="w-5 h-5 text-primary" />
                 </div>
-                <h3 className="font-display font-semibold text-sm mb-2">{f.title}</h3>
-                <p className="text-muted-foreground text-xs leading-relaxed">{f.desc}</p>
+                <h3 className="font-display font-semibold text-xs mb-2">{f.title}</h3>
+                <p className="text-muted-foreground text-2xs leading-relaxed">{f.desc}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Planos */}
+      {/* ── Planos ── */}
       <section id="planos" className="py-24 px-6 bg-surface/30">
         <div className="container max-w-5xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="font-display font-bold text-xl md:text-2xl mb-4">
               Planos simples e <span className="text-gradient">transparentes</span>
             </h2>
+            <p className="text-xs text-muted-foreground">Comece grátis e escale conforme sua necessidade.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {plans.map((plan, i) => (
               <motion.div
                 key={plan.name}
                 className={cn(
-                  "p-6 rounded-xl border",
+                  "p-6 rounded-xl border relative",
                   plan.popular
-                    ? "border-primary/50 shadow-glow bg-card"
+                    ? "border-primary/50 shadow-glow bg-card ring-1 ring-primary/20"
                     : "border-border bg-card"
                 )}
                 initial={{ opacity: 0, y: 20 }}
@@ -252,15 +276,17 @@ const LandingPage = () => {
                 viewport={{ once: true }}
               >
                 {plan.popular && (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-2xs font-semibold bg-primary/10 text-primary border border-primary/20 mb-3">
-                    <Star className="w-2.5 h-2.5" /> Mais popular
-                  </span>
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-2xs font-bold bg-primary text-primary-foreground shadow-glow">
+                      <Star className="w-2.5 h-2.5 fill-current" /> Mais popular
+                    </span>
+                  </div>
                 )}
-                <h3 className="font-display font-bold text-sm mb-1">{plan.name}</h3>
-                <p className="text-2xl font-bold text-foreground mb-5">{plan.price}</p>
-                <ul className="space-y-2 mb-6">
+                <h3 className="font-display font-bold text-sm mb-1 mt-2">{plan.name}</h3>
+                <p className="font-bold text-2xl text-foreground mb-5">{plan.price}</p>
+                <ul className="space-y-2.5 mb-6">
                   {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <li key={f} className="flex items-start gap-2 text-2xs text-muted-foreground">
                       <CheckCircle className="w-3.5 h-3.5 text-success flex-shrink-0 mt-0.5" />
                       {f}
                     </li>
@@ -272,7 +298,7 @@ const LandingPage = () => {
                     "block text-center py-2.5 rounded-lg text-xs font-semibold transition-all duration-200",
                     plan.popular
                       ? "bg-gradient-primary text-primary-foreground hover:shadow-glow"
-                      : "border border-border hover:border-primary/40 hover:bg-surface"
+                      : "border border-border hover:border-primary/40 hover:bg-surface text-foreground"
                   )}
                 >
                   Começar grátis
@@ -283,8 +309,22 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* CTA Final */}
-      <section className="py-24 px-6">
+      {/* ── FAQ ── */}
+      <section id="faq" className="py-24 px-6">
+        <div className="container max-w-3xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="font-display font-bold text-xl md:text-2xl mb-4">
+              Perguntas <span className="text-gradient">frequentes</span>
+            </h2>
+          </div>
+          <div className="space-y-3">
+            {faqs.map((faq) => <FAQItem key={faq.q} q={faq.q} a={faq.a} />)}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA Final ── */}
+      <section className="py-24 px-6 bg-surface/30">
         <div className="container max-w-3xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -296,15 +336,15 @@ const LandingPage = () => {
               Pronto para ter uma equipe sênior{" "}
               <span className="text-gradient">trabalhando por você?</span>
             </h2>
-            <p className="text-muted-foreground mb-8">
+            <p className="text-xs text-muted-foreground mb-8">
               Comece gratuitamente. Nenhum cartão de crédito necessário.
             </p>
             <Link
               to="/cadastro"
               className={cn(
-                "inline-flex items-center gap-2 px-8 py-3.5 rounded-xl text-sm font-semibold",
+                "inline-flex items-center gap-2 px-8 py-3.5 rounded-xl text-xs font-semibold",
                 "bg-gradient-primary text-primary-foreground",
-                "hover:shadow-glow-lg transition-all duration-300 hover:scale-105"
+                "hover:shadow-glow-lg transition-all duration-300 hover:scale-105 active:scale-100"
               )}
             >
               Criar conta grátis <ArrowRight className="w-4 h-4" />
@@ -313,21 +353,28 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Footer */}
+      {/* ── Footer ── */}
       <footer className="border-t border-border py-8 px-6">
-        <div className="container max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-gradient-primary flex items-center justify-center">
-              <Sparkles className="w-3 h-3 text-primary-foreground" />
+        <div className="container max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded bg-gradient-primary flex items-center justify-center">
+                <Sparkles className="w-3 h-3 text-primary-foreground" />
+              </div>
+              <span className="font-display font-bold text-xs">Arquiteto IA</span>
             </div>
-            <span className="font-display font-bold text-xs">Arquiteto IA</span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            © 2025 Arquiteto IA. Todos os direitos reservados.
-          </p>
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <a href="#" className="hover:text-foreground transition-colors">Privacidade</a>
-            <a href="#" className="hover:text-foreground transition-colors">Termos</a>
+            <div className="flex flex-wrap items-center justify-center gap-6 text-2xs text-muted-foreground">
+              <a href="#funcionalidades" className="hover:text-foreground transition-colors">Funcionalidades</a>
+              <a href="#planos" className="hover:text-foreground transition-colors">Planos</a>
+              <a href="#faq" className="hover:text-foreground transition-colors">FAQ</a>
+              <Link to="/login" className="hover:text-foreground transition-colors">Login</Link>
+              <Link to="/cadastro" className="hover:text-foreground transition-colors">Cadastro</Link>
+            </div>
+            <div className="flex items-center gap-4 text-2xs text-muted-foreground">
+              <a href="#" className="hover:text-foreground transition-colors">Privacidade</a>
+              <a href="#" className="hover:text-foreground transition-colors">Termos</a>
+              <p>© 2025 Arquiteto IA</p>
+            </div>
           </div>
         </div>
       </footer>
