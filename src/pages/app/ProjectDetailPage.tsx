@@ -34,7 +34,7 @@ import {
 } from "recharts";
 
 
-const TABS = [
+const SYSTEM_TABS = [
   { id: "overview",  label: "Visão Geral",    icon: Layers     },
   { id: "idea",      label: "Ideia Original", icon: Lightbulb  },
   { id: "modules",   label: "Módulos",        icon: Puzzle     },
@@ -46,9 +46,23 @@ const TABS = [
   { id: "eval",      label: "Avaliação",      icon: BarChart3  },
   { id: "versions",  label: "Versões",        icon: History    },
   { id: "ai",        label: "Revisão IA",     icon: Bot        },
-] as const;
+];
 
-type TabId = typeof TABS[number]["id"];
+const WEBSITE_TABS = [
+  { id: "overview",   label: "Visão Geral",   icon: Layers     },
+  { id: "idea",       label: "Briefing",      icon: Lightbulb  },
+  { id: "pages",      label: "Páginas",       icon: Monitor    },
+  { id: "copy",       label: "Copywriting",   icon: ScrollText },
+  { id: "seo",        label: "SEO",           icon: TrendingUp },
+  { id: "structure",  label: "Estrutura",     icon: Code2      },
+  { id: "prompts",    label: "Prompts",       icon: Zap        },
+  { id: "exports",    label: "Exportações",   icon: Download   },
+  { id: "eval",       label: "Avaliação",     icon: BarChart3  },
+  { id: "versions",   label: "Versões",       icon: History    },
+  { id: "ai",         label: "Revisão IA",    icon: Bot        },
+];
+
+type TabId = string;
 
 const statusConfig = {
   draft:    { label: "Rascunho", classes: "bg-warning/10 text-warning border-warning/20" },
