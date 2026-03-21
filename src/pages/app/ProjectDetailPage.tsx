@@ -1598,6 +1598,7 @@ const ProjectDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const contentRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -1611,6 +1612,8 @@ const ProjectDetailPage = () => {
   const toggleFavorite = useToggleFavorite();
   const updateProject = useUpdateProject(id);
   const deleteProject = useDeleteProject();
+  // BUG 1 FIX: use the shared hook with proper slugify + cache invalidation
+  const duplicateProject = useDuplicateProject();
 
   // Hydrate cache from persisted metadata on first load
   useEffect(() => {
@@ -1624,9 +1627,14 @@ const ProjectDetailPage = () => {
     }
   }, [project, cacheInitialized]);
 
-  // Scroll to top on tab change
+  // UX FIX: scroll the AppLayout main container (not window) to top on tab change
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const mainEl = document.querySelector("main");
+    if (mainEl) {
+      mainEl.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }, [activeTab]);
 
   // When AI generates content: update in-memory cache AND persist to project.metadata
@@ -1662,32 +1670,10 @@ const ProjectDetailPage = () => {
     });
   };
 
-  const handleDuplicate = async () => {
+  // BUG 1 FIX: delegate to useDuplicateProject hook (uses slugify, invalidates queries correctly)
+  const handleDuplicate = () => {
     if (!project) return;
-    const { data, error: dupError } = await supabase
-      .from("projects")
-      .insert([{
-        user_id: project.user_id,
-        title: `${project.title} (Cópia)`,
-        slug: `${project.slug ?? project.id}-copia-${Date.now()}`,
-        original_idea: project.original_idea,
-        type: project.type,
-        niche: project.niche,
-        complexity: project.complexity,
-        platform: project.platform,
-        audience: project.audience,
-        features: project.features ?? [],
-        monetization: project.monetization,
-        integrations: project.integrations ?? [],
-        metadata: project.metadata as never,
-        status: "draft" as const,
-      }])
-      .select()
-      .single();
-    if (dupError) { toast.error("Erro ao duplicar projeto."); return; }
-    toast.success("Projeto duplicado!");
-    queryClient.invalidateQueries({ queryKey: ["projects"] });
-    navigate(`/app/projetos/${data.id}`);
+    duplicateProject.mutate(project.id);
   };
 
   const handleShare = async () => {
