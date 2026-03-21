@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { User, Palette, Bell, CreditCard, Shield, Sun, Moon, Save, Check, Lock, Bot, Trash2, AlertTriangle } from "lucide-react";
+import { User, Palette, Bell, CreditCard, Shield, Sun, Moon, Save, Check, Lock, Bot, Trash2, AlertTriangle, Zap } from "lucide-react";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
