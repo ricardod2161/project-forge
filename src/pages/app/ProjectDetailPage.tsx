@@ -1068,7 +1068,7 @@ const AIContentTabWrapper = ({
   onContentGenerated,
 }: {
   projectId: string;
-  contentType: "modules" | "database" | "rules";
+  contentType: "modules" | "database" | "rules" | "site_pages" | "site_copy" | "site_seo" | "site_structure";
   icon: React.ElementType;
   title: string;
   description: string;
