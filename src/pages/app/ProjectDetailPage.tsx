@@ -908,12 +908,14 @@ const ScreensTabWrapper = ({
   onContentGenerated,
   projectMetadata,
   onUpdateMetadata,
+  projectPlatform,
 }: {
   projectId: string;
   persistedContent: string | null;
   onContentGenerated: (contentType: string, content: string) => void;
   projectMetadata: Record<string, unknown> | null;
   onUpdateMetadata: (patch: Record<string, unknown>) => void;
+  projectPlatform?: string;
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -970,6 +972,7 @@ const ScreensTabWrapper = ({
       onGenerate={handleGenerate}
       initialMockups={initialMockups}
       onMockupSaved={handleMockupSaved}
+      projectPlatform={projectPlatform}
     />
   );
 };

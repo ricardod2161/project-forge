@@ -797,6 +797,8 @@ const ScreensWithMockups = ({
                 projectId={projectId}
                 mockup={mockups[screen.name] ?? { url: null, prevUrl: null, isLoading: false, error: null, persisted: false }}
                 onMockupGenerated={handleMockupGenerated}
+                platformType={projectPlatform}
+                isMobile={isMobilePlatform}
               />
             ))}
           </div>
