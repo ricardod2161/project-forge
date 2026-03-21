@@ -1094,7 +1094,7 @@ const ProjectDetailPage = () => {
     }
   }, [project, cacheInitialized]);
 
-  // When AI generates content: update in-memory cache AND persist to project.metadata
+  // When AI generates content: update in-memory cache AND persist to project.metadata (silently)
   const handleContentGenerated = useCallback((contentType: string, content: string) => {
     setAiContentCache(prev => ({ ...prev, [contentType]: content }));
     // Persist to DB: merge into metadata.ai_content
@@ -1106,7 +1106,8 @@ const ProjectDetailPage = () => {
           ...currentMeta,
           ai_content: { ...currentAI, [contentType]: content },
         } as never,
-      });
+        _silent: true,
+      } as never);
     }
   }, [project, updateProject]);
 
