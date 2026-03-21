@@ -1,129 +1,73 @@
 
+## Elevar a Inteligência da IA — Prompts de Nível Enterprise
 
-## Melhorias da Página de Detalhe do Projeto v1.0
+### O problema identificado
 
-### Estado atual (análise completa do arquivo — 1649 linhas)
+O prompt de exemplo que você enviou tem qualidade **muito superior** ao que a IA está gerando hoje. A diferença está em 3 pontos:
 
-- **OverviewTab** (linha 120): tem campos genéricos, sem dados de site, sem label de complexidade
-- **PromptsTab** (linha 289): já tem sub-abas por tipo + FocusModal + histórico de versões — **já implementado em grande parte**. Falta apenas ajustar detalhes
-- **EvalTab** (linha 862): `useState` local perde resultado ao trocar de aba
-- **VersionsTab** (linha 1020): sem botão de criar versão manual
-- **InlineExportTab** (linha 1314): só exporta documentação, sem opção de prompts
-- **Header card** (linha 1475): sem score label textual, sem barra de completude, sem Duplicar/Copiar link
-- **Tabs** (linha 1579): sem dot indicador de conteúdo por aba
-- **Skeleton loading** (linha 1437): muito básico
+**1. `generate-prompt/index.ts` — system prompt genérico demais**
+O system prompt atual pede "7 seções estruturadas" mas não ensina a IA o *nível de detalhe* esperado. O exemplo tem:
+- Estratégia de renderização por rota (SSG/ISR/SSR com justificativa)
+- Design system com CSS variables reais (`--color-accent: #3B82F6`)
+- Schema Prisma completo com enums, relações e campos
+- API routes com corpo, validação Zod, ações e códigos de resposta
+- Checklist verificável com itens concretos (não genéricos)
 
----
+**2. `instructions` de cada tipo — muito curtas (1 linha)**
+Exemplo atual do tipo `master`: _"Crie um prompt mestre completo para o Lovable que descreve todo o sistema..."_ — 1 frase. O exemplo real tem 12 seções densas.
 
-### Bloco 1 — Header: score label + completude + duplicar/compartilhar
-
-**1.1 Score label**: adicionar texto classificatório abaixo do `ScoreRing` (linha 1531–1533). Lógica: ≥90 Enterprise, ≥80 Sênior, ≥65 Avançado, ≥40 Intermediário, else Básico.
-
-**1.2 Complexidade label**: no `OverviewTab` (linha 143–156), adicionar `complexityLabels` record e renderizar label descritivo abaixo da barra.
-
-**1.3 Barra de completude**: após os badges no header (linha 1499), adicionar barra de progresso que calcula `completedSections` a partir de `aiContentCache` + `project.original_idea` + `prompts`. Requer `useProjectPrompts` no nível do `ProjectDetailPage` e passar `prompts` como prop para a lógica.
-
-**1.4 Menu de ações**: no `DropdownMenuContent` (linha 1554), adicionar "Duplicar projeto" e "Copiar link" antes do separator. `handleDuplicate` faz `supabase.from("projects").insert(...)` e navega. `handleShare` copia a URL atual.
-
-Importar `Share2`, `ChevronRight` de lucide-react.
+**3. `userPrompt` — não injeta exemplos de nível**
+A IA não sabe que precisa incluir especificações como "SSG para `/home`, ISR revalidate:3600 para `/cases/[slug]`" ou CSS variables hex reais.
 
 ---
 
-### Bloco 2 — Abas: dot indicador + scroll ao trocar
+### O que será alterado: apenas `supabase/functions/generate-prompt/index.ts`
 
-**2.1 Dot indicador**: criar `tabHasContent` record no `ProjectDetailPage` após `TABS` ser definido. Passar para o render de cada botão de aba como dot verde de 6px posicionado `absolute top-0.5 right-0.5`.
+**A. System prompt elevado** — ensiná-la com exemplos do formato exato:
 
-**2.2 Scroll ao trocar de aba**: `useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [activeTab]);` — já existe o AnimatePresence, só falta o scroll.
+Para sistemas: incluir exemplos de como escrever estratégia de renderização, design system com CSS variables, schema de banco, api routes com zod
+Para sites: incluir exemplos de como escrever design system com CSS variables, estrutura de rotas com estratégias (SSG/ISR), copywriting por seção com H1/CTAs reais
 
-**Nota**: AnimatePresence já está implementado na linha 1598. Não precisa alterar.
+**B. Instructions de cada tipo** — expandir de 1 linha para parágrafos densos com subitens específicos:
 
----
+| Tipo | Instrução atual | Nova instrução |
+|---|---|---|
+| `master` | 1 frase | 10+ bullets: stack, renderização por rota, design tokens, schema, rules, auth, env vars, checklist |
+| `frontend` | 1 frase | Componentes por página, design system tokens, responsividade, estados (loading/empty/error), acessibilidade |
+| `backend` | 1 frase | Edge functions com validação Zod, RLS policies por tabela, webhooks, autenticação JWT |
+| `database` | 1 frase | Schema com SQL completo, índices com justificativa, RLS, triggers, ERD |
+| `mvp` | 1 frase | Scope reduzido com critérios de corte, time-to-market, funcionalidades core vs descartadas |
+| `site_master` | 1 frase | Stack + rotas + rendering strategy + design tokens CSS + componentes + SEO + checklist |
+| `site_design` | 1 frase | CSS variables com valores HEX reais, tipografia Google Fonts com pesos, escala tipográfica com classes Tailwind, microinterações |
+| (demais) | similares | expansão proporcional |
 
-### Bloco 3 — PromptsTab: verificação do estado atual
+**C. `userPrompt` elevado** — adicionar instruções de qualidade mínima:
 
-Após análise do código (linhas 289–562), o `PromptsTab` **já tem**:
-- Sub-abas por tipo com dots verde/cinza
-- FocusModal
-- Version selector (dropdown)
-- Gerar/Regenerar states
-- `isWebsite` prop
+```
+O prompt deve OBRIGATORIAMENTE incluir:
+- Especificação de rendering strategy por rota (SSG/ISR/SSR) com justificativa
+- Design system com CSS variables reais (valores HEX específicos, não genéricos)  
+- Schema de banco com SQL completo (tipos, constraints, defaults, RLS)
+- API Routes com validação, corpo esperado e códigos de resposta
+- Checklist verificável de entrega (20+ itens concretos, não genéricos)
+- Variáveis de ambiente necessárias com comentário de onde obter
+- Exemplos de dados realistas (não "Lorem ipsum" ou "exemplo_generico")
+```
 
-O que **falta** é o `SYSTEM_PROMPT_TYPES` vs `WEBSITE_PROMPT_TYPES` já existem como `PROMPT_TYPES_LIST` e `WEBSITE_PROMPT_TYPES_LIST`. Já está correto.
-
-**Ajuste pontual**: o bloco de "Estado 2: não gerado" (linha 430) mostra um botão "Gerar com IA" — adicionar um atalho via Enter e ajustar o texto do label para usar `platform` badge colorido.
-
-**Bloco 3 real**: pequeno ajuste cosmético — adicionar `shortLabel` já existe, mas o label na plataforma badge para tipos sem cor definida em `platformBadgeClasses` (ex: "Geral", "Figma / Lovable", "Vercel / Netlify") cai no `undefined` e não renderiza estilo. Corrigir o `platformBadgeClasses` para ter fallback.
-
----
-
-### Bloco 4 — EvalTab: persistência no cache
-
-**Problema**: `EvalTab` (linha 862) usa `useState<EvalResult | null>(null)` — perde resultado ao trocar de aba.
-
-**Solução**:
-1. Adicionar `evalResultCache` state no `ProjectDetailPage`: `const [evalResultCache, setEvalResultCache] = useState<EvalResult | null>(null);`
-2. Alterar `EvalTab` para aceitar `cachedResult: EvalResult | null` e `onResultCached: (r: EvalResult) => void`
-3. Inicializar `const [result, setResult] = useState<EvalResult | null>(cachedResult);`
-4. Chamar `onResultCached(data.evaluation)` após `setResult(data.evaluation)` (linha 881)
-5. Atualizar callsite na linha 1621
-
-**Arquivos**: apenas `ProjectDetailPage.tsx`
+**D. `maxTokens` de 4096 → 8192** — prompts de nível enterprise precisam de mais tokens. O modelo Groq 70B suporta até 32K de output, então aumentar para 8192 sem custo adicional.
 
 ---
 
-### Bloco 5 — VersionsTab: botão criar versão manual
+### Arquivo alterado
 
-**Problema**: `VersionsTab` (linha 1020–1060) só lista versões, sem criar.
+Apenas `supabase/functions/generate-prompt/index.ts` — sem tocar em UI, banco ou outras funções.
 
-**Solução**: adicionar estados `isCreating`, `note`, `showForm` dentro de `VersionsTab`. Adicionar `useQueryClient` ao componente. Renderizar header com "N versão(ões)" + botão "Nova versão" que toggle um form. Form tem `textarea` para nota + botões Criar/Cancelar. `handleCreateVersion` insere via `supabase.from("project_versions").insert(...)`.
+### Resultado esperado
 
----
-
-### Bloco 6 — InlineExportTab: exportar prompts
-
-**Problema**: `InlineExportTab` (linha 1314) só exporta documentação do projeto.
-
-**Solução**:
-1. Adicionar `useProjectPrompts(project.id)` no componente
-2. Adicionar `exportMode` state: `"doc" | "prompts"`
-3. Toggle de 2 botões no topo (Documentação Técnica / Todos os Prompts)
-4. Função `generatePromptsDoc()` que formata todos os prompts em texto
-5. Adaptar `handleCopy`, `handleDownload` e preview para usar o conteúdo correto baseado em `exportMode`
-
----
-
-### Bloco 7 — OverviewTab: dados de site
-
-**Problema**: `OverviewTab` (linha 120–194) não exibe dados específicos de site (estilo, tom, seções, e-commerce/blog/form).
-
-**Solução**:
-1. Adicionar `isWebsite` ao `OverviewTab` props (ou detectar via `project.metadata.mode`)
-2. Quando `isWebsite`, substituir campo "Monetização" por "Estilo Visual" e "Tom de Voz" lendo de `projectMeta`
-3. Adicionar seção "Seções do Site" com chips se `website_sections` array existir
-4. Adicionar seção de recursos com badges para `website_has_ecommerce`, `website_has_blog`, `website_has_form`
-
-Importar `Palette`, `ShoppingCart`, `Mail` de lucide-react (verificar o que já está importado — `Mail` não está, `ShoppingCart` não está, `Palette` não está).
-
----
-
-### Bloco 8 — Polish geral
-
-**8.1 Breadcrumb**: substituir botão simples "Todos os projetos" (linha 1468–1472) por breadcrumb com `Meus Projetos > {title}`. Usar `ChevronRight` já importado mas não listado — verificar e adicionar se necessário.
-
-**8.2 Skeleton melhorado** (linha 1437–1444): substituir os 3 blocos básicos por skeleton que imita o layout real (header card, fila de tabs, área de conteúdo).
-
-**8.3 Linha colorida no header**: adicionar elemento `div` de 3px de altura com gradiente baseado no `quality_score` no topo do header card. Usar `style={{ background: ... }}`.
-
-**8.4 Tooltip no título**: o hover com ícone Edit3 já existe (linha 1516–1521). Adicionar título `title="Clique para editar"` no `h1`.
-
----
-
-### Arquivos alterados
-
-Apenas `src/pages/app/ProjectDetailPage.tsx` — cirurgicamente, bloco a bloco.
-
-### Novos imports necessários
-- `Share2`, `ChevronRight`, `Palette`, `ShoppingCart`, `Mail` de lucide-react
-- Verificar que `useQueryClient` já está importado em `VersionsTab` (não está — adicionar ao componente)
-- `useProjectPrompts` já importado no nível de arquivo
-
+Prompts gerados que incluam:
+- Rendering strategy por rota (como no exemplo)
+- CSS variables com HEX reais adaptadas ao nicho
+- Schema Prisma/SQL com campos reais do projeto
+- API routes completas com validação Zod
+- Checklist verificável de 20+ itens
+- Mínimo efetivo de 1.500 palavras (hoje gera ~900 médio)
