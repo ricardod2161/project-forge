@@ -75,7 +75,7 @@ const AppHeader = () => {
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            onClick={() => setIsDark(!isDark)}
+            onClick={toggleTheme}
             aria-label="Alternar tema"
           >
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}

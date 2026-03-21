@@ -908,6 +908,12 @@ const ProjectDetailPage = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
+  // Persists AI-generated content for the lifetime of the parent component (survives tab switching)
+  const [aiContentCache, setAiContentCache] = useState<Record<string, string | null>>({});
+
+  const handleContentGenerated = useCallback((contentType: string, content: string) => {
+    setAiContentCache(prev => ({ ...prev, [contentType]: content }));
+  }, []);
 
   const { data: project, isLoading, error } = useProjectDetail(id);
   const toggleFavorite = useToggleFavorite();
