@@ -7,7 +7,7 @@ import {
   Bot, MoreHorizontal, Trash2, Archive, Edit3, Tag, Users, Globe, Puzzle,
   RefreshCw, AlertTriangle, AlertCircle, Lightbulb as LightbulbIcon, TrendingUp, ShieldAlert,
   Plus, Loader2, FileText, ChevronDown, Maximize2, X, Share2, ChevronRight,
-  Palette, ShoppingCart, Mail,
+  Palette, ShoppingCart, Mail, Wand2, CheckCircle2, XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
