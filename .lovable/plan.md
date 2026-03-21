@@ -1,143 +1,227 @@
 
-## Redesign da PromptsTab — Sub-abas por tipo com geração inline
+## Expansão: Criação de Sites v1.0 — Plano Completo
 
-### Estado atual (problema)
-O `PromptsTab` atual (linhas 199–334 do ProjectDetailPage.tsx) funciona assim:
-- Lista todos os prompts em cards empilhados, misturados por tipo
-- Para gerar: clica em "Gerar Prompt com IA" → abre um painel flutuante com chips de tipo → clica "Gerar"
-- Não há separação visual por tipo
-- O preview usa `line-clamp-3` — trunca o conteúdo
-- Não há como ver o prompt de um tipo específico sem rolar por todos
+### Diagnóstico real do codebase
 
-### O que será construído
-Um componente `PromptsTab` completamente novo com:
+**Arquivos confirmados e seu estado atual:**
+- `useProjectWizard.ts` — Zustand store com 4 steps sistema (Ideia/Classificação/Detalhamento/Confirmação), sem campo `mode`
+- `useProjects.ts` — `CreateProjectInput` sem campos de site, `useCreateProject` não salva `metadata`
+- `NewProjectPage.tsx` — 747 linhas, 4 steps fixos para sistema, `STEPS = ["Ideia","Classificação","Detalhamento","Confirmação"]`
+- `ProjectDetailPage.tsx` — `TABS` é `const` com `as const`, todos os 11 tabs fixos para sistema
+- `generate-prompt/index.ts` — `PROMPT_TYPES` tem apenas 10 tipos de sistema
+- `generate-ai-content/index.ts` — `ContentType = "modules" | "screens" | "database" | "rules"` apenas
+- `TemplatesPage.tsx` — sem filtro de modo, usa Skeleton local (a ser substituído), `handleUseTemplate` não chama `setMode`
+- `ProjectCard.tsx` — sem prop `mode`, sem badge "Site"
 
-**1. Sub-abas horizontais por tipo (10 tipos)**
-Barra horizontal com os 10 tipos: Mestre, Frontend, Backend, Banco, Dashboard, MVP, Premium, Correção, Refatoração, Multiplataforma.
+**Ponto crítico identificado:** `TABS` em `ProjectDetailPage.tsx` usa `as const` (linha 37-49), o que significa que `TabId` é inferido dos valores. Para tornar os tabs dinâmicos por modo, precisamos remover o `as const` e criar dois arrays separados `SYSTEM_TABS` e `WEBSITE_TABS`.
 
-- Cada tab tem badge de status:
-  - Cinza = "Não gerado"
-  - Verde com número de versão = "Gerado v1, v2..."
-  - Spinner animado = "Gerando..."
-- Ao carregar, detecta quais tipos já têm prompts no banco para colorir os badges
+---
 
-**2. Painel de conteúdo por tipo selecionado**
+### Bloco 1 — `useProjectWizard.ts`
+Adicionar campos ao `WizardState`:
+- `mode: "system" | "website"`
+- `websiteSections: string[]`
+- `websiteStyle`, `websiteTone`, `websiteCMS: string`
+- `websiteHasEcommerce`, `websiteHasBlog`, `websiteHasForm: boolean`
 
-Estado 1 — Não gerado:
-- Card vazio com ícone do tipo + descrição do que o prompt faz
-- Botão "Gerar com IA" centralizado
-- Plataforma alvo indicada (Lovable / Supabase / Bubble)
+Adicionar actions correspondentes e incluir todos no `partialize`. Ajustar `nextStep` para máximo `Math.min(s.currentStep + 1, 4)` (sistema tem 5 steps: Tipo + 4 anteriores).
 
-Estado 2 — Gerando:
-- `AIStreamingIndicator` centralizado
-- Skeletons de linhas de texto
+---
 
-Estado 3 — Gerado:
-- Header: tipo badge + versão badge + tokens + platform badge + botão "Copiar" + botão "Regenerar"
-- Corpo: `<pre>` com `font-mono text-2xs` em `ScrollArea` com `max-h-[520px]` — sem truncamento, scroll completo
-- Footer: data geração + contador de linhas + tokens estimados
+### Bloco 2 — `useProjects.ts`
+- Adicionar campos opcionais a `CreateProjectInput`: `mode`, `website_*`
+- Em `useCreateProject.mutationFn`, passar `metadata: { mode: input.mode ?? "system", ...dados do site }` no insert
+- `useDuplicateProject` já existe — copiar `metadata` do projeto original também
 
-**3. Histórico de versões por tipo**
-Se o tipo tem múltiplas versões (ex: v1, v2, v3):
-- Dropdown "Versão: v3 ▼" no header que lista versões anteriores
-- Ao selecionar, exibe o conteúdo daquela versão (read-only para versões antigas)
-- Versão mais recente = editável/regenerável
+---
 
-**4. Fluxo de geração**
-- Clica "Gerar" → `isGenerating[tipo] = true` → chama Edge Function → `invalidateQueries` → exibe conteúdo
-- Geração independente por tipo (um pode estar gerando enquanto outro já está pronto)
-- `generatingTypes: Set<string>` para múltiplos estados simultâneos
+### Bloco 3 — `NewProjectPage.tsx` (maior mudança)
 
-### Estrutura de dados
+**Nova estrutura de steps:**
+- Step 0 = `StepModo` (novo) — dois cards: Sistema vs Site
+- Steps do sistema: Ideia (1) → Classificação (2) → Detalhamento (3) → Confirmação (4)
+- Steps do site: Ideia (1) → StepSite (2) → Confirmação (3)
+
+**Lógica da barra de progresso:**
 ```
-prompts (do banco) agrupados por tipo:
-{
-  "master": [{ id, content, version: 2, tokens_estimate, created_at }, { version: 1, ... }],
-  "frontend": [{ id, content, version: 1, ... }],
-  "mvp": [],  // não gerado
-  ...
-}
+const STEPS_SYSTEM = ["Tipo", "Ideia", "Classificação", "Detalhamento", "Confirmação"];
+const STEPS_WEBSITE = ["Tipo", "Ideia", "Site", "Confirmação"];
+const STEPS = mode === "website" ? STEPS_WEBSITE : STEPS_SYSTEM;
 ```
 
-### Arquivos a modificar
-Apenas **`src/pages/app/ProjectDetailPage.tsx`** — apenas o componente `PromptsTab` (linhas 199–334).
+**Mapeamento de steps para componentes:**
+- currentStep 0 → `StepModo`
+- currentStep 1 → `StepIdeia` (adaptado com placeholder por modo)
+- currentStep 2:
+  - mode === "system" → `StepClassificacao`
+  - mode === "website" → `StepSite` (novo)
+- currentStep 3:
+  - mode === "system" → `StepDetalhamento`
+  - mode === "website" → `StepConfirmacaoSite` (confirmação adaptada)
+- currentStep 4 (só sistema) → `StepConfirmacao` atual
 
-### Layout visual
+**`StepModo`**: dois cards grandes lado a lado com Framer Motion stagger, ícones `Cpu` e `Globe`. Clique → `setMode()` + `nextStep()` automático.
+
+**`StepSite`**: campos WEBSITE_TYPES (grid 3 cols), NICHES reutilizados, WEBSITE_SECTIONS (grid chips multi-select), WEBSITE_STYLES (grid), WEBSITE_TONES (chips single), 3 Switches, CMS condicional, WEBSITE_INTEGRATIONS. Botão "Próximo" ativo quando `type && websiteStyle && niche`.
+
+**`StepConfirmacaoSite`**: resumo adaptado para site + `handleCreate` passa `metadata` completo.
+
+**`handleCreate` no confirmação de site:**
+```ts
+createProject({
+  title: derivedTitle,
+  original_idea: idea,
+  type,
+  niche,
+  complexity: 2, // sites são menos complexos
+  platform: "Web",
+  audience: "",
+  features: websiteSections,
+  monetization: "",
+  integrations,
+  status: "draft",
+  mode: "website",
+  website_sections: websiteSections,
+  website_style: websiteStyle,
+  website_tone: websiteTone,
+  website_cms: websiteCMS,
+  website_has_ecommerce: websiteHasEcommerce,
+  website_has_blog: websiteHasBlog,
+  website_has_form: websiteHasForm,
+})
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ [Mestre ●v2] [Frontend ●v1] [Backend] [Banco] [Dashboard] ···  │
-├─────────────────────────────────────────────────────────────────┤
-│ ┌─ Header ────────────────────────────────────────────────────┐ │
-│ │  [Mestre] [v2] [1.247 tokens] [Lovable]   [Copiar][Regen.] │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-│                                                                   │
-│ ┌─ Conteúdo (scroll) ─────────────────────────────────────────┐ │
-│ │  ## 1. CONTEXTO DO PROJETO                                  │ │
-│ │  Este sistema é uma plataforma SaaS B2B...                  │ │
-│ │  ...                                                        │ │
-│ │  [scroll]                                                   │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-│                                                                   │
-│  Gerado em 15 mar 2026 · 312 linhas · Versão v2 de 3 versões    │
-└─────────────────────────────────────────────────────────────────┘
+
+---
+
+### Bloco 4 — `generate-prompt/index.ts`
+- Adicionar `WEBSITE_PROMPT_TYPES` com os 10 tipos de site (site_master, site_copy, site_seo, site_design, site_sections, site_performance, site_forms, site_ecommerce, site_cms, site_deploy)
+- Lógica: `const isSiteType = prompt_type.startsWith("site_")`
+- `typeConfig` = `isSiteType ? WEBSITE_PROMPT_TYPES[prompt_type] : PROMPT_TYPES[prompt_type]`
+- Adicionar `siteContext` ao `userPrompt` quando `isSiteType`
+
+---
+
+### Bloco 5 — `generate-ai-content/index.ts`
+- Expandir `ContentType` para incluir `"site_pages" | "site_copy" | "site_seo" | "site_structure"`
+- Adicionar instruções em `contentInstructions` para os 4 novos tipos
+- Adicionar `websiteContext` ao `userPrompt` quando `isWebsite`
+
+---
+
+### Bloco 6 — `ProjectDetailPage.tsx`
+
+**Mudança estrutural em TABS:**
+```ts
+// Remover `as const` e criar dois arrays
+const SYSTEM_TABS = [
+  { id: "overview", label: "Visão Geral", icon: Layers },
+  { id: "idea", label: "Ideia Original", icon: Lightbulb },
+  { id: "modules", label: "Módulos", icon: Puzzle },
+  { id: "screens", label: "Telas", icon: Monitor },
+  { id: "database", label: "Banco de Dados", icon: Database },
+  { id: "rules", label: "Regras", icon: ScrollText },
+  { id: "prompts", label: "Prompts", icon: Zap },
+  { id: "exports", label: "Exportações", icon: Download },
+  { id: "eval", label: "Avaliação", icon: BarChart3 },
+  { id: "versions", label: "Versões", icon: History },
+  { id: "ai", label: "Revisão IA", icon: Bot },
+];
+
+const WEBSITE_TABS = [
+  { id: "overview", label: "Visão Geral", icon: Layers },
+  { id: "idea", label: "Briefing", icon: Lightbulb },
+  { id: "pages", label: "Páginas", icon: Monitor },
+  { id: "copy", label: "Copywriting", icon: ScrollText },
+  { id: "seo", label: "SEO", icon: TrendingUp },
+  { id: "structure", label: "Estrutura", icon: Code2 },
+  { id: "prompts", label: "Prompts", icon: Zap },
+  { id: "exports", label: "Exportações", icon: Download },
+  { id: "eval", label: "Avaliação", icon: BarChart3 },
+  { id: "versions", label: "Versões", icon: History },
+  { id: "ai", label: "Revisão IA", icon: Bot },
+];
 ```
 
-### Implementação técnica
+`TabId` passa a ser `string` (sem `as const`). `activeTab` tipado como `string`.
 
+**Detecção de modo:**
+```ts
+const projectMeta = (project.metadata as Record<string, unknown>) ?? {};
+const isWebsite = projectMeta.mode === "website";
+const TABS = isWebsite ? WEBSITE_TABS : SYSTEM_TABS;
+```
+
+**Renderização das abas de site:**
+- `pages` → `AIContentTabWrapper` com `contentType="site_pages"`
+- `copy` → `AIContentTabWrapper` com `contentType="site_copy"`
+- `seo` → `AIContentTabWrapper` com `contentType="site_seo"`
+- `structure` → `AIContentTabWrapper` com `contentType="site_structure"`
+
+**PromptsTab — adaptação por modo:**
+Receber `isWebsite` como prop e usar:
+```ts
+const WEBSITE_PROMPT_TYPES_LIST = [
+  { value: "site_master", label: "Mestre do Site", shortLabel: "Mestre", platform: "Lovable", desc: "..." },
+  { value: "site_copy", label: "Copywriting", shortLabel: "Copy", platform: "Geral", desc: "..." },
+  // ... 8 mais
+];
+
+// No componente:
+const promptTypesList = isWebsite ? WEBSITE_PROMPT_TYPES_LIST : PROMPT_TYPES_LIST;
+```
+
+**Badge de modo no header do projeto:**
+Após os badges existentes (status, niche, type), adicionar:
 ```tsx
-const PromptsTab = ({ projectId }: { projectId: string }) => {
-  const { data: prompts, isLoading } = useProjectPrompts(projectId);
-  const [selectedType, setSelectedType] = useState("master");
-  const [generatingTypes, setGeneratingTypes] = useState<Set<string>>(new Set());
-  const [selectedVersions, setSelectedVersions] = useState<Record<string, number>>({}); 
-  // { "master": 2, "frontend": 1 } = versão selecionada para exibição
-  const queryClient = useQueryClient();
-
-  // Agrupar prompts por tipo, ordenado por versão DESC
-  const promptsByType = useMemo(() => {
-    const grouped: Record<string, Prompt[]> = {};
-    for (const type of PROMPT_TYPES_LIST.map(t => t.value)) {
-      grouped[type] = [];
-    }
-    for (const p of (prompts ?? [])) {
-      if (grouped[p.type]) {
-        grouped[p.type].push(p);
-      }
-    }
-    // Sort each type by version DESC
-    for (const type in grouped) {
-      grouped[type].sort((a, b) => b.version - a.version);
-    }
-    return grouped;
-  }, [prompts]);
-
-  // Prompt ativo = versão selecionada do tipo selecionado
-  const typePrompts = promptsByType[selectedType] ?? [];
-  const selectedVersion = selectedVersions[selectedType] ?? typePrompts[0]?.version;
-  const activePrompt = typePrompts.find(p => p.version === selectedVersion) ?? typePrompts[0];
-
-  const handleGenerate = async (type: string) => {
-    setGeneratingTypes(prev => new Set(prev).add(type));
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-prompt", {
-        body: { project_id: projectId, prompt_type: type },
-      });
-      if (error) throw error;
-      if (data?.error) { toast.error(data.error); return; }
-      toast.success("Prompt gerado e salvo!");
-      queryClient.invalidateQueries({ queryKey: ["prompts", projectId] });
-      queryClient.invalidateQueries({ queryKey: ["all-prompts"] });
-    } catch { toast.error("Erro ao gerar prompt."); }
-    finally {
-      setGeneratingTypes(prev => { const s = new Set(prev); s.delete(type); return s; });
-    }
-  };
-  // ... render
-};
+{isWebsite && (
+  <span className="px-2.5 py-1 rounded-full text-2xs font-medium bg-accent/10 text-accent border border-accent/20 flex items-center gap-1">
+    <Globe className="w-2.5 h-2.5" />
+    Site
+  </span>
+)}
 ```
+
+---
+
+### Bloco 7 — `TemplatesPage.tsx` + `ProjectCard.tsx`
+
+**TemplatesPage:**
+- Substituir Skeleton local por `import { Skeleton } from "@/components/ui/skeleton"`
+- Adicionar `TemplateContent` expandido com campos `mode`, `website_*`
+- Estado `modeFilter: "all" | "system" | "website"`
+- Toggle buttons acima dos filtros de nicho
+- `handleUseTemplate` para sites: chamar `setMode("website")` + `setWebsiteStyle`, `setWebsiteTone`, `toggleWebsiteSection` quando `content.mode === "website"`
+- Filtro: `const matchMode = modeFilter === "all" || (templateContent.mode ?? "system") === modeFilter`
+
+**ProjectCard.tsx:**
+- Adicionar prop `mode?: "system" | "website"` à interface
+- Adicionar import `Globe` de lucide-react
+- Badge condicional após `niche`: se `mode === "website"` mostrar badge "Site" com Globe
+- Sem mudança em outros aspectos do card
+
+**Passar `mode` nos cards:**
+- `DashboardPage`: `mode={(project.metadata as Record<string,unknown>)?.mode as "system"|"website" ?? "system"}`
+- `ProjectsPage`: idem
+
+---
+
+### Templates SQL (inserir via Supabase insert tool)
+8 templates de sites conforme especificado (SaaS Landing, Portfólio, Restaurante, Clínica, Evento, Blog, Agência, Loja Virtual) inseridos via ferramenta de insert.
+
+---
 
 ### Ordem de execução
-1. Substituir o `PromptsTab` atual (linhas 199–334) pelo novo componente completo
-2. Adicionar import de `useMemo` (já existe como import de react), `ScrollArea` do shadcn
-3. Adicionar import de `ChevronDown` (já importado) e `DropdownMenu` (já importado)
-4. Zero mudanças em outros arquivos — tudo contido no PromptsTab
+
+| Ordem | Arquivo | Impacto |
+|---|---|---|
+| 1 | `useProjectWizard.ts` | Base de tudo |
+| 2 | `useProjects.ts` | Persistência de metadados |
+| 3 | `NewProjectPage.tsx` | Wizard adaptativo (maior mudança) |
+| 4 | `generate-prompt/index.ts` | 10 novos tipos site |
+| 5 | `generate-ai-content/index.ts` | 4 novos content types site |
+| 6 | `ProjectDetailPage.tsx` | TABS dinâmicas + PromptsTab adaptativa |
+| 7 | `TemplatesPage.tsx` | Filtro modo + handleUseTemplate site |
+| 8 | `ProjectCard.tsx` | Badge site |
+| 9 | Insert SQL | 8 templates de sites |
+
+**Garantia zero-regressão:** sistemas existentes continuam usando os mesmos fluxos — a lógica de `mode === "website"` é sempre aditiva com fallback para `"system"`.
