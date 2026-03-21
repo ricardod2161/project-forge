@@ -286,30 +286,37 @@ const IdeaTab = ({ idea }: { idea: string | null | undefined }) => {
 };
 
 // ── Tab: Prompts ───────────────────────────────────────────────────────────────
+// Hierarquia: Nível 1 (Mestre) → Nível 2 (Módulos independentes)
 const PROMPT_TYPES_LIST = [
-  { value: "master",        label: "Mestre",         shortLabel: "Mestre",    platform: "Lovable",          desc: "Prompt completo com toda a arquitetura do projeto." },
-  { value: "frontend",      label: "Frontend",       shortLabel: "Frontend",  platform: "Lovable",          desc: "Componentes, páginas e design system do frontend." },
-  { value: "backend",       label: "Backend",        shortLabel: "Backend",   platform: "Supabase",         desc: "Banco de dados, funções edge e regras de negócio." },
-  { value: "database",      label: "Banco",          shortLabel: "Banco",     platform: "Supabase",         desc: "Schema SQL completo com tabelas, índices e RLS." },
-  { value: "dashboard",     label: "Dashboard",      shortLabel: "Dash",      platform: "Lovable",          desc: "Painel administrativo com métricas e gráficos." },
-  { value: "mvp",           label: "MVP",            shortLabel: "MVP",       platform: "Lovable",          desc: "Versão mínima viável com as funcionalidades core." },
-  { value: "premium",       label: "Premium",        shortLabel: "Premium",   platform: "Lovable",          desc: "Versão avançada com todas as funcionalidades." },
-  { value: "correction",    label: "Correção",       shortLabel: "Correção",  platform: "Lovable",          desc: "Guia para correção de bugs e melhorias de qualidade." },
-  { value: "refactoring",   label: "Refatoração",    shortLabel: "Refactor",  platform: "Lovable",          desc: "Reestruturação de código para escalabilidade." },
-  { value: "multiplatform", label: "Multiplataforma",shortLabel: "Multi",     platform: "Bubble",           desc: "Versão para múltiplas plataformas e dispositivos." },
+  // — NÍVEL 1: Contexto —
+  { value: "master",        label: "Mestre",         shortLabel: "Mestre",    platform: "Lovable",  desc: "Contexto, stack, design tokens e regras. Base para todos os módulos." },
+  // — NÍVEL 2: Módulos independentes —
+  { value: "auth",          label: "Autenticação",   shortLabel: "Auth",      platform: "Supabase", desc: "Fluxo completo de auth, guards, profiles e roles — escopo exclusivo." },
+  { value: "frontend",      label: "Frontend",       shortLabel: "Frontend",  platform: "Lovable",  desc: "Componentes, design system em código e animações — sem SQL." },
+  { value: "backend",       label: "Backend",        shortLabel: "Backend",   platform: "Supabase", desc: "Edge Functions, RLS policies e webhooks — sem schema SQL detalhado." },
+  { value: "database",      label: "Banco",          shortLabel: "Banco",     platform: "Supabase", desc: "Schema SQL completo, índices e triggers — sem Edge Functions." },
+  { value: "dashboard",     label: "Dashboard",      shortLabel: "Dash",      platform: "Lovable",  desc: "Painel analítico com KPIs, gráficos Recharts e filtros." },
+  { value: "mvp",           label: "MVP",            shortLabel: "MVP",       platform: "Lovable",  desc: "Escopo mínimo viável: validar hipótese em < 2 semanas." },
+  { value: "premium",       label: "Premium",        shortLabel: "Premium",   platform: "Lovable",  desc: "Versão completa: planos, integrações avançadas e IA." },
+  { value: "correction",    label: "Correção",       shortLabel: "Correção",  platform: "Lovable",  desc: "Mapa de bugs comuns + checklist de debugging metódico." },
+  { value: "refactoring",   label: "Refatoração",    shortLabel: "Refactor",  platform: "Lovable",  desc: "Arquitetura limpa, TypeScript strict e performance." },
+  { value: "multiplatform", label: "No-code",        shortLabel: "No-code",   platform: "Bubble",   desc: "Equivalente no-code em Bubble ou Bolt." },
 ];
 
+// Hierarquia: Nível 1 (Mestre) → Nível 2 (Módulos independentes)
 const WEBSITE_PROMPT_TYPES_LIST = [
-  { value: "site_master",      label: "Mestre do Site",  shortLabel: "Mestre",    platform: "Lovable",          desc: "Prompt mestre completo para construir todo o site." },
-  { value: "site_copy",        label: "Copywriting",     shortLabel: "Copy",      platform: "Geral",            desc: "Textos persuasivos para todas as seções do site." },
-  { value: "site_seo",         label: "Estratégia SEO",  shortLabel: "SEO",       platform: "Geral",            desc: "Keywords, meta tags, schema markup e checklist SEO." },
-  { value: "site_design",      label: "Design System",   shortLabel: "Design",    platform: "Figma / Lovable",  desc: "Paleta de cores, tipografia e componentes visuais." },
-  { value: "site_sections",    label: "Seções do Site",  shortLabel: "Seções",    platform: "Lovable",          desc: "Código detalhado para cada seção selecionada." },
-  { value: "site_performance", label: "Performance",     shortLabel: "Perf",      platform: "Geral",            desc: "Lazy loading, Core Web Vitals e checklist lighthouse." },
-  { value: "site_forms",       label: "Formulários",     shortLabel: "Forms",     platform: "Lovable",          desc: "Formulários com validação, integração e LGPD." },
-  { value: "site_ecommerce",   label: "E-commerce",      shortLabel: "Loja",      platform: "Lovable",          desc: "Catálogo, carrinho, checkout e painel admin." },
-  { value: "site_cms",         label: "Blog / CMS",      shortLabel: "CMS",       platform: "Lovable",          desc: "Blog com paginação, SEO e integração com CMS." },
-  { value: "site_deploy",      label: "Deploy",          shortLabel: "Deploy",    platform: "Vercel / Netlify", desc: "Guia completo de deploy e go-live." },
+  // — NÍVEL 1: Contexto —
+  { value: "site_master",      label: "Mestre",          shortLabel: "Mestre",  platform: "Lovable",          desc: "Contexto, stack, mapa de rotas e tokens. Base para os demais módulos." },
+  // — NÍVEL 2: Módulos independentes —
+  { value: "site_design",      label: "Design System",   shortLabel: "Design",  platform: "Figma / Lovable",  desc: "CSS variables HSL reais, tipografia, microinterações — código completo." },
+  { value: "site_copy",        label: "Copywriting",     shortLabel: "Copy",    platform: "Geral",            desc: "Textos reais por seção: headline, body, CTAs — sem meta tags técnicas." },
+  { value: "site_seo",         label: "SEO Técnico",     shortLabel: "SEO",     platform: "Geral",            desc: "Keywords, JSON-LD, meta tags e Core Web Vitals — sem copywriting." },
+  { value: "site_sections",    label: "Seções",          shortLabel: "Seções",  platform: "Lovable",          desc: "Código de cada seção com layout, Framer Motion e conteúdo real." },
+  { value: "site_performance", label: "Performance",     shortLabel: "Perf",    platform: "Geral",            desc: "LCP, CLS, INP, imagens e bundle — Lighthouse 95+." },
+  { value: "site_forms",       label: "Formulários",     shortLabel: "Forms",   platform: "Lovable",          desc: "Zod + react-hook-form + integrações + LGPD." },
+  { value: "site_ecommerce",   label: "E-commerce",      shortLabel: "Loja",    platform: "Lovable",          desc: "Catálogo, carrinho, checkout Stripe/MP e painel admin." },
+  { value: "site_cms",         label: "Blog / CMS",      shortLabel: "CMS",     platform: "Lovable",          desc: "Blog com CMS (Contentful/Notion/MDX), SEO e newsletter." },
+  { value: "site_deploy",      label: "Deploy",          shortLabel: "Deploy",  platform: "Vercel / Netlify", desc: "Vercel config, domínio, SSL, analytics e checklist de lançamento." },
 ];
 
 const platformBadgeClasses: Record<string, string> = {
