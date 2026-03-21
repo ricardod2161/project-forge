@@ -1073,17 +1073,43 @@ const ProjectDetailPage = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
-  // Persists AI-generated content for the lifetime of the parent component (survives tab switching)
+  // In-memory cache for tab switching (hydrated from project.metadata.ai_content on first load)
   const [aiContentCache, setAiContentCache] = useState<Record<string, string | null>>({});
-
-  const handleContentGenerated = useCallback((contentType: string, content: string) => {
-    setAiContentCache(prev => ({ ...prev, [contentType]: content }));
-  }, []);
+  const [cacheInitialized, setCacheInitialized] = useState(false);
 
   const { data: project, isLoading, error } = useProjectDetail(id);
   const toggleFavorite = useToggleFavorite();
   const updateProject = useUpdateProject(id);
   const deleteProject = useDeleteProject();
+
+  // Hydrate cache from persisted metadata on first load
+  useEffect(() => {
+    if (project && !cacheInitialized) {
+      const meta = (project.metadata as Record<string, unknown>) ?? {};
+      const saved = (meta.ai_content ?? {}) as Record<string, string>;
+      if (Object.keys(saved).length > 0) {
+        setAiContentCache(saved);
+      }
+      setCacheInitialized(true);
+    }
+  }, [project, cacheInitialized]);
+
+  // When AI generates content: update in-memory cache AND persist to project.metadata (silently)
+  const handleContentGenerated = useCallback((contentType: string, content: string) => {
+    setAiContentCache(prev => ({ ...prev, [contentType]: content }));
+    // Persist to DB: merge into metadata.ai_content
+    if (project) {
+      const currentMeta = (project.metadata as Record<string, unknown>) ?? {};
+      const currentAI = (currentMeta.ai_content ?? {}) as Record<string, string>;
+      updateProject.mutate({
+        metadata: {
+          ...currentMeta,
+          ai_content: { ...currentAI, [contentType]: content },
+        } as never,
+        _silent: true,
+      } as never);
+    }
+  }, [project, updateProject]);
 
   const handleStatusChange = (status: "draft" | "active" | "archived") => {
     updateProject.mutate({ status });
@@ -1268,7 +1294,7 @@ const ProjectDetailPage = () => {
             {activeTab === "prompts"   && <PromptsTab projectId={project.id} />}
             {activeTab === "versions"  && <VersionsTab projectId={project.id} />}
             {activeTab === "modules"   && <AIContentTabWrapper projectId={project.id} contentType="modules" icon={Puzzle} title="Módulos do Sistema" description="A IA decomporá o projeto em módulos bem definidos, com funcionalidades, dependências e complexidade de cada um." persistedContent={aiContentCache["modules"] ?? null} onContentGenerated={handleContentGenerated} />}
-            {activeTab === "screens"   && <ScreensTabWrapper projectId={project.id} persistedContent={aiContentCache["screens"] ?? null} onContentGenerated={handleContentGenerated} projectMetadata={(project.metadata as Record<string, unknown>) ?? {}} onUpdateMetadata={(patch) => updateProject.mutate({ metadata: patch as never })} projectPlatform={project.platform ?? undefined} />}
+            {activeTab === "screens"   && <ScreensTabWrapper projectId={project.id} persistedContent={aiContentCache["screens"] ?? null} onContentGenerated={handleContentGenerated} projectMetadata={(project.metadata as Record<string, unknown>) ?? {}} onUpdateMetadata={(patch) => updateProject.mutate({ metadata: patch as never, _silent: true } as never)} projectPlatform={project.platform ?? undefined} />}
             {activeTab === "database"  && <AIContentTabWrapper projectId={project.id} contentType="database" icon={Database} title="Esquema do Banco de Dados" description="A IA gerará o schema SQL completo com tabelas, relacionamentos, índices e RLS policies." persistedContent={aiContentCache["database"] ?? null} onContentGenerated={handleContentGenerated} />}
             {activeTab === "rules"     && <AIContentTabWrapper projectId={project.id} contentType="rules" icon={ScrollText} title="Regras de Negócio" description="A IA documentará todas as regras de negócio, validações e fluxos condicionais do sistema." persistedContent={aiContentCache["rules"] ?? null} onContentGenerated={handleContentGenerated} />}
             {activeTab === "exports"   && <InlineExportTab project={project} />}

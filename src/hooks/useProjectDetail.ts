@@ -105,21 +105,22 @@ export function useUpdateProject(id: string | undefined) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (updates: ProjectUpdatePayload) => {
+    mutationFn: async (updates: ProjectUpdatePayload & { _silent?: boolean }) => {
+      const { _silent: _, ...cleanUpdates } = updates;
       const { data, error } = await supabase
         .from("projects")
-        .update(updates as Record<string, unknown>)
+        .update(cleanUpdates as Record<string, unknown>)
         .eq("id", id!)
         .select()
         .single();
       if (error) throw error;
-      return data as Project;
+      return { project: data as Project, silent: _ };
     },
-    onSuccess: () => {
+    onSuccess: ({ silent }) => {
       queryClient.invalidateQueries({ queryKey: ["project", id] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       queryClient.invalidateQueries({ queryKey: ["recent-projects"] });
-      toast.success("Projeto atualizado!");
+      if (!silent) toast.success("Projeto atualizado!");
     },
     onError: (error: Error) => {
       toast.error(`Erro ao atualizar: ${error.message}`);
