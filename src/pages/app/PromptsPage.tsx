@@ -138,7 +138,7 @@ const CopyButton = ({ text, compact = false }: { text: string; compact?: boolean
         compact ? "px-2 py-1" : "px-2.5 py-1.5"
       )}
     >
-      {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+      {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
       {copied ? "Copiado!" : "Copiar"}
     </button>
   );
