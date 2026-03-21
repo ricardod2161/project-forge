@@ -1,138 +1,113 @@
 
-## Auditoria Completa da PromptsPage — Upgrade 100% Premium
+## Upgrade de Mockups — Imagens Ultra-Realistas v4.0
 
-### Problemas identificados na página atual (imagem + código)
+### Diagnóstico real do sistema atual
 
-**1. CRÍTICO — Não há forma de VER o prompt completo**
-O preview usa `line-clamp-4` no `<pre>` — corta o conteúdo após 4 linhas sem nenhum botão "Expandir" ou "Ver completo". O usuário quer ler o prompt inteiro mas não há modal, drawer, nem expansão inline. Isso é a principal reclamação.
+**O que está funcionando:**
+- Edge Function `generate-screen-mockup` existe e faz upload no Storage
+- Modelo já é `google/gemini-3.1-flash-image-preview` (correto)
+- Parser de telas robusto com 6 padrões regex
+- Persistência via `project.metadata.mockups`
+- Lightbox, download, progresso em lote — tudo funcional
 
-**2. CRÍTICO — Prompt listado em fonte mono `text-2xs` (10px) num `<pre>` bruto**
-O conteúdo é código/texto estruturado mas aparece em `<pre>` sem formatação — sem quebras visuais, sem highlights de seções `###`, sem hierarquia. Muito difícil de ler.
+**O PROBLEMA REAL — por que as imagens não são realistas:**
 
-**3. IMPORTANTE — Nenhum indicador de data de criação nos cards**
-O campo `created_at` existe no schema mas não é exibido. Usuário não sabe quando o prompt foi gerado.
+O prompt atual, apesar de extenso, tem falhas críticas de engenharia de prompt para geração de imagens:
 
-**4. IMPORTANTE — Sem ordenação dos prompts**
-Só existe a ordem padrão (created_at DESC). Sem opção de ordenar por projeto, tipo, tokens ou data.
+1. **Prompt não força o modelo a gerar uma IMAGEM REAL de UI** — o texto é longo mas não diz "create a SCREENSHOT", "render actual UI components as pixels", "photorealistic interface". O modelo pode interpretar como "descreva" ao invés de "renderize".
 
-**5. IMPORTANTE — Sem ação de "Excluir" um prompt**
-Não há forma de deletar prompts antigos/duplicados. O botão de ações de cada card tem apenas "Copiar". Falta: Excluir, Ver projeto, e Ver prompt completo.
+2. **Sem anchoring visual para o modelo de imagem** — prompts de geração de imagem precisam de âncoras como "as seen in Figma", "high-resolution product screenshot", "render exactly as it would appear on screen". Sem isso, o modelo gera ilustrações abstratas.
 
-**6. IMPORTANTE — Busca limitada a `sm:max-w-sm`**
-A busca fica espremida no lado esquerdo. Deveria ser full-width em mobile e ter botão de "limpar" inline.
+3. **`## Tela: NomeDaTela` no contentInstructions usa formato exato** mas o modelo IA pode variar — e o parser já lida com isso. Porém a `screen_description` que chega para a Edge Function de imagem está sendo truncada em 400 chars, cortando contexto visual crítico.
 
-**7. IMPORTANTE — Sem estatísticas/resumo no topo**
-A tela não mostra quantos tokens totais, quantos projetos cobertos, qual o tipo mais usado. Dados valiosos que já existem.
+4. **Aspect ratio fixo 9/16** no card — mas se o projeto é Desktop (Web), gerar em 9/16 é errado. Precisa de `16/9` para Web e `9/16` para Mobile.
 
-**8. MENOR — `max-w-4xl` no container limita demais o espaço**
-Com sidebar recolhida, a tela tem ~900px mas o conteúdo fica constrangido a `max-w-4xl` (896px). Com sidebar expandida fica ainda pior.
+5. **Sem `style_preset` no card** — o usuário não pode pedir "mais claro", "mais colorido", "iOS style" — tudo vai dark por padrão.
 
-**9. MENOR — Filtros de tipo só aparecem quando há mais de 1 tipo**
-Se o usuário tem prompts de apenas 1 tipo, os chips somem. Deveria mostrar sempre para dar contexto.
+6. **Prompt não usa técnica de "negative prompting"** — sem dizer o que NÃO gerar: "no text overlays, no Lorem ipsum, no wireframe sketches, no cartoon style".
 
-**10. MENOR — Ausência de ação rápida "Gerar Novo Prompt"**
-O header tem "Ir para projetos" mas não tem um atalho direto para gerar prompt em um projeto específico.
+7. **`screen_description` passa apenas 4 linhas de texto** ao invés de todo o contexto estruturado da tela (componentes, estados, navegação) que foi gerado pelo `generate-ai-content`.
 
----
+8. **Nenhum context injection de features ricas** — se o projeto é "Clínica SaaS", o mockup deveria ter campos "Paciente", "CRM", "Agendamento" — mas o prompt apenas menciona o nicho sem aprofundar.
 
-### O que será implementado
+### Solução — 3 mudanças de alto impacto
 
-#### 1. Modal "Ver Prompt Completo" — funcionalidade principal
+#### 1. Edge Function `generate-screen-mockup` — Prompt de engenharia avançada
 
-Componente `PromptDetailModal` usando `Dialog` (shadcn já instalado):
-- Abre ao clicar no card ou no botão "Ver completo"
-- Exibe prompt formatado com **Markdown rendering** (usando o mesmo `MarkdownRenderer` do `ScreensWithMockups`)
-- Header do modal: badge de tipo, título, platform, versão
-- Footer: botão "Copiar", contador de tokens, link para o projeto
-- Scroll interno com altura máxima (`max-h-[75vh] overflow-y-auto`)
-- Botão `Esc` fecha, botão X no canto
+**Técnica: Hierarchical Photorealistic UI Prompt**
 
-#### 2. Formatação rica do preview no card
+```
+CRITICAL INSTRUCTION: Generate a PHOTOREALISTIC HIGH-FIDELITY screenshot of a real software application UI.
+This must look like an ACTUAL SCREENSHOT taken from a real, production-ready software product.
+NOT a wireframe. NOT a sketch. NOT an illustration. A REAL UI screenshot.
 
-Ao invés de `<pre>` com `line-clamp-4`:
-- Mostrar as primeiras 3 linhas não-vazias do conteúdo como texto normal
-- Renderizar headers `###` em negrito
-- Botão "Ver prompt completo →" no final do preview (sempre visível)
-- Número de linhas totais como indicador: "247 linhas · 1.159 tokens"
+[contexto do projeto]
 
-#### 3. Ação de excluir prompts
+SCREEN: "${screen_name}"
+DETAILED DESCRIPTION:
+${screen_description}  ← agora passa MAIS contexto
 
-- Mutation `useDeletePrompt` no `useProjectDetail.ts`
-- Dropdown de ações no card: "Ver completo", "Copiar", "Ir para projeto", separador, "Excluir"
-- `AlertDialog` de confirmação antes de excluir
+PIXEL-LEVEL RENDERING REQUIREMENTS:
+- Render as a REAL application screenshot at exact ${resolution} resolution
+- Every UI component must be FULLY RENDERED with realistic colors, shadows, and typography
+- NO placeholder boxes — replace with ACTUAL rendered components
+- Text must be READABLE and REALISTIC (domain-specific, not Lorem ipsum)
+- Background: ${bgColor} — SOLID rendered pixels, not a sketch
+- Buttons must look CLICKABLE with proper states (hover/default)
+- Icons must be ACTUAL icons (not shapes) — use recognizable icon designs
+- Input fields must have REALISTIC borders, focus rings, placeholder text
+- Show a COMPLETE screen — status bar at top (mobile) / window chrome (desktop)
 
-#### 4. Barra de estatísticas no topo
+NEGATIVE PROMPT: no wireframe lines, no hand-drawn style, no cartoon, no abstract art, 
+no placeholder text, no grey boxes, no sketch lines, no Lorem ipsum, no flat icons only
 
-Quando há prompts, mostrar 3 stats:
-- Total de tokens estimados de todos os prompts
-- Número de projetos com prompts
-- Tipo mais gerado
-
-#### 5. Busca full-width + clear inline
-
-- Input de busca com width full no mobile, `max-w-md` no desktop
-- Ícone de X inline quando há texto digitado (limpa com um clique)
-- Contador de resultados: "3 de 12 prompts"
-
-#### 6. Ordenação dos prompts
-
-Dropdown "Ordenar por": Data (padrão), Tokens (maior), Tipo, Projeto — ordenação client-side no `useMemo`.
-
-#### 7. Indicador de data nos cards
-
-Data relativa no footer: "há 2 dias" usando `formatDistanceToNow` do `date-fns` (já instalado via shadcn calendar).
-
-#### 8. Layout responsivo melhorado
-
-- Remover `max-w-4xl` e usar `w-full` com padding adequado
-- Cards com hover mais pronunciado (borda colorida, elevação sutil)
-- Mobile: botões de ação empilhados verticalmente no card
-
-#### 9. Hook `useDeletePrompt`
-
-```ts
-export function useDeletePrompt() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("prompts").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["all-prompts"] });
-      queryClient.invalidateQueries({ queryKey: ["prompts"] });
-      toast.success("Prompt excluído.");
-    },
-  });
-}
+STYLE REFERENCE: This should look like a screenshot from Linear, Vercel Dashboard, or Figma — 
+professional SaaS tool at the highest visual quality level.
 ```
 
----
+#### 2. Passar a descrição COMPLETA da tela (não truncada)
+
+Atualmente `ScreensWithMockups` passa apenas as primeiras 4 linhas como `screen_description`. Vamos extrair **toda a seção da tela** do Markdown gerado pelo `generate-ai-content` e enviar completo para a Edge Function.
+
+No `parseScreens()`, ao invés de coletar apenas 4 linhas, coletar até 800 chars da descrição completa da tela. Isso garante que todos os componentes UI, estados e dados listados pelo Gemini 2.5 Flash chegam ao modelo de imagem.
+
+#### 3. Aspect ratio inteligente + Device Frame
+
+- Detectar plataforma do projeto: se `platform` contém "mobile/ios/android" → `aspect-[9/16]`; caso contrário (Web/Desktop) → `aspect-[16/10]`
+- Adicionar `platform_type` no payload da request para a Edge Function
+- No prompt: adaptar resolução e layout conforme plataforma
 
 ### Arquivos a modificar
 
-| Arquivo | Ação |
-|---|---|
-| `src/pages/app/PromptsPage.tsx` | Reescrever completo — modal, stats, ordenação, exclusão, melhor preview |
-| `src/hooks/useProjectDetail.ts` | Adicionar `useDeletePrompt` mutation |
+| Arquivo | Mudança | Impacto |
+|---|---|---|
+| `supabase/functions/generate-screen-mockup/index.ts` | Prompt ultra-realista com negative prompts + context completo | CRÍTICO |
+| `src/components/ScreensWithMockups.tsx` | Parser coleta descrição completa (800 chars) + aspect ratio por plataforma + passa platform_type | ALTO |
+| `src/pages/app/ProjectDetailPage.tsx` | Passar `projectPlatform` para `ScreensTabWrapper` → `ScreensWithMockups` → Edge Function | MÉDIO |
 
-### Detalhes da UI do modal
+### Detalhes da nova arquitetura de prompt
 
-```
-┌─────────────────────────────────────────────────────┐
-│ [Master] Prompt Mestre Lovable          v1  [X]     │
-│ Lovable · 1.159 tokens · Clínica — SaaS             │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  ## OBJETIVO DO CORE ENGINE                         │
-│  Construir SaaS B2B para gestão de clínicas...      │
-│  [conteúdo completo com scroll]                     │
-│                                                     │
-├─────────────────────────────────────────────────────┤
-│  [Copiar]   [Ir para projeto ↗]                     │
-└─────────────────────────────────────────────────────┘
-```
+**Prompt estruturado em 5 blocos:**
+1. `CRITICAL INSTRUCTION` — instrução imperativa de "screenshot real"
+2. `PROJECT CONTEXT` — nicho, título, público, plataforma, features
+3. `SCREEN SPECIFICATION` — nome + descrição completa da tela
+4. `VISUAL RENDERING REQUIREMENTS` — especificações pixel a pixel
+5. `NEGATIVE PROMPT` — o que NÃO gerar
+6. `STYLE REFERENCE` — âncoras visuais ("like Linear", "like Vercel", "like Figma")
+
+**Contextualização por nicho** — nova função `getNicheContext()`:
+- `clinica/saúde` → "patient records, appointment calendar, medical staff profiles, CPF/CRM fields"
+- `ecommerce` → "product catalog, cart summary, order status, SKU, price variations"  
+- `financeiro` → "charts, transaction history, balance cards, currency formatting BRL"
+- `educação` → "course cards, progress bars, video player, quiz interface"
+- etc.
+
+**Âncoras visuais por tipo:**
+- Web SaaS → "similar to Linear.app, Vercel dashboard, Notion"
+- Mobile → "similar to Instagram, WhatsApp, Uber interface quality"
+- Admin → "similar to Retool, Metabase, Grafana"
 
 ### Ordem de execução
-1. `useDeletePrompt` em `useProjectDetail.ts`
-2. Reescrever `PromptsPage.tsx` completamente com todas as melhorias
+1. Edge Function `generate-screen-mockup` — novo prompt completo
+2. `ScreensWithMockups` — parser com mais contexto + aspect ratio inteligente
+3. `ProjectDetailPage` — passar platform para ScreensTabWrapper
