@@ -1,130 +1,141 @@
 
-## Avaliação Real do Sistema + Plano de Elevação para Produção v2.2
+## Diagnóstico Completo — 17 anos de experiência, zero tolerância a bug
 
-### Estado atual — diagnóstico honesto após leitura completa
+### Estado atual do sistema (leitura de 32 arquivos)
 
-**O que já funciona bem (não tocar):**
-- Auth completo (login, cadastro, logout, proteção de rotas)
-- Banco com 5 tabelas + RLS + triggers no SQL (migrations existem)
-- Dashboard carregando métricas reais via React Query
-- Wizard 4 etapas salvando na tabela `projects`
+**O que funciona corretamente:**
+- Auth (login/cadastro/logout) com tratamento de erros traduzidos
+- Wizard 4 etapas com Zustand persist + refinar ideia com IA funcional
+- Dashboard com métricas reais via React Query
+- ProjectsPage com busca e filtros funcionais
 - ProjectDetailPage com 11 abas, edição inline, favoritar, excluir
-- Revisão IA via Edge Function (M13) funcional
-- Todas as páginas secundárias (Prompts, Templates, Versões, Avaliações, Configurações, Exportações) com dados reais
-- Design system visual coerente (dark/light, Sora + DM Sans)
+- ProjectCard com dropdown de ações (favoritar, arquivar)
+- CommandPalette Cmd+K funcional
+- 5 Edge Functions deployadas (review-project, generate-prompt, refine-idea, generate-ai-content, evaluate-project)
+- RLS em todas as tabelas
+- Revisão IA (M13) funcional, Score de Qualidade (M12) funcional
+- PromptsPage, TemplatesPage, VersionsPage, EvaluationsPage, SettingsPage, ExportsPage todas funcionais
 
-**Problemas reais identificados (o que de fato precisa ser corrigido):**
+### Bugs reais identificados (não cosméticos)
 
-1. **CRÍTICO — Triggers não existem no banco** — `supabase-config` confirma: "There are no triggers in the database." As migrations SQL criaram os triggers mas não foram executados no banco real. Todos os `updated_at` nunca atualizam.
+**BUG 1 — CRÍTICO: Trigger `on_auth_user_created` ainda não existe no banco**
+A migration `20260321002512` tentou criar o trigger com `DO $$ IF NOT EXISTS` mas a tabela consultada (`pg_trigger`) não inclui triggers de schema `auth`. O resultado: a `db-triggers` confirma `"There are no triggers in the database"`. Isso significa que `profiles` nunca é criado automaticamente, quebrando `SettingsPage` (erro silencioso no `.single()` sem perfil) e `AppHeader` (displayName pode ser undefined).
 
-2. **CRÍTICO — `db-functions` mostra `handle_new_user` sem trigger** — O trigger que chama `handle_new_user` ao criar usuário também não existe, o que significa que novos cadastros **não criam perfil na tabela `profiles`** — quebrando `SettingsPage` e `AppHeader`.
+**BUG 2 — CRÍTICO: `AIContentTabWrapper` usa variável errada `err` ao invés de `error`**
+Em `ProjectDetailPage.tsx` linha 857:
+```ts
+} as { data: { content?: string; error?: string } | null; err?: unknown };
+if (err) throw err;
+```
+O destructuring do `invoke` retorna `{ data, error }` não `err`. Este bug silencia completamente erros das 4 abas de IA (Módulos, Telas, Banco, Regras) — sempre chega como `undefined`, jogando pro catch genérico.
 
-3. **IMPORTANTE — `NewProjectPage` — botão "Refinar com IA" sem funcionalidade** — O botão existe com classe `border-primary/40 text-primary` mas sem handler. Nenhuma Edge Function de refinamento existe.
+**BUG 3 — CRÍTICO: `SettingsPage` usa `useTheme` do `next-themes`**
+`AppearanceSection` importa `useTheme` de `next-themes` (linha 4). O projeto **não usa** `next-themes` — o tema é controlado via `document.documentElement.classList` no `AppHeader`. Isso faz a seção de Aparência em Configurações nunca refletir o tema atual e não mudar o tema quando acionada.
 
-4. **IMPORTANTE — Command Palette (Cmd+K) no header** — O botão de busca existe visualmente mas não abre nenhum modal. O `cmdk` já está instalado no `package.json`.
+**BUG 4 — IMPORTANTE: `AIContentTabWrapper` — estado de geração perdido ao trocar abas**
+Cada vez que o usuário clica em outra aba e volta, o conteúdo gerado desaparece (state local). O conteúdo gerado por IA deve ser persistido enquanto o componente pai estiver montado.
 
-5. **IMPORTANTE — `PlansPage` sem conexão ao plano real do usuário** — O plano atual está hardcoded como `current: true` no plano Free, sem ler a coluna `plan` da tabela `profiles`.
+**BUG 5 — IMPORTANTE: `PromptsPage` sem link para gerar prompt**
+A PromptsPage lista prompts mas o empty state direciona para "Criar primeiro projeto" em vez de "Ir para um projeto e gerar prompts". Sem forma de gerar diretamente da PromptsPage (diferente do ProjectDetailPage que tem o gerador inline).
 
-6. **IMPORTANTE — `EvaluationsPage` e `ProjectDetailPage` — aba "Avaliação"** — Não há forma de executar a avaliação de score. A aba "eval" mostra apenas `EmptyTab`. Não existe Edge Function para calcular quality_score.
+**BUG 6 — IMPORTANTE: `ExportsPage` aba "exports" na ProjectDetailPage ainda usa `EmptyTab`**
+Linha 1087: `{activeTab === "exports" && <EmptyTab ...>}` — nunca foi conectada à exportação real. O usuário que abre a aba "Exportações" dentro de um projeto específico vê placeholder.
 
-7. **IMPORTANTE — `NewProjectPage` — Etapa 3 "Refinar com IA"** — O botão não tem handler. Falta Edge Function `refine-idea`.
+**BUG 7 — MENOR: `LandingPage` — seção "Como Funciona" tem connector arrows com posição incorreta**
+Linha 184: `<div className="hidden md:block absolute mt-7 ml-48 w-16 h-px bg-border" />` dentro de um elemento com `className="flex flex-col items-center text-center"` que não tem `relative`. As setas ficam posicionadas incorretamente.
 
-8. **MELHORIA — `LandingPage`** — Seção de FAQ existe mas os itens não têm accordion interativo. A seção de features está estática sem animações de entrada no scroll. Sem seção "Como Funciona" com 3 passos.
+**BUG 8 — MENOR: `DashboardPage` — métrica "Projetos Ativos" sempre 0**
+Se o usuário nunca mudou o status de "draft" para "active", mostra 0. Seria mais útil mostrar "Favoritos" ou "Rascunhos" no lugar.
 
-9. **MELHORIA — `ProjectDetailPage` abas "Módulos", "Telas", "Banco de Dados", "Regras"** — Mostram `EmptyTab` estáticos. Devem oferecer geração por IA via Edge Function.
+**BUG 9 — MENOR: `PlansPage` — botão "Começar agora" sem funcionalidade**
+Todos os botões de plano redirecionam para `/cadastro` mesmo quando o usuário já está logado (PlansPage é uma rota autenticada). Deve redirecionar para Configurações ou exibir "Entrar em contato".
 
-10. **MELHORIA — Gerador de Prompts com IA real (M09)** — A `PromptsPage` lista prompts salvos mas não tem forma de gerar novos. A aba "Prompts" em `ProjectDetailPage` lista prompts salvos mas sem botão "Gerar". Não existe Edge Function `generate-prompt`.
+**BUG 10 — MENOR: Falta de `ThemeProvider` — `next-themes` importado mas sem Provider**
+`AppearanceSection` importa `next-themes` mas `next-themes` não tem `ThemeProvider` no `App.tsx`. Vai crashar silenciosamente.
+
+**BUG 11 — COSMÉTICO: `tailwind.config.ts` usa `darkMode: ["class"]` mas o tema dark é `:root` e o light é `.light`**
+O Tailwind está configurado para dark mode via classe, mas o CSS usa `:root` para escuro e `.light` para claro. Isso é invertido — quando Tailwind adiciona `.dark` a nada muda, quando remove também. O tema funciona porque o AppHeader manualmente adiciona/remove `.light`, mas é frágil.
+
+**BUG 12 — COSMÉTICO: `AppHeader` e `SettingsPage` têm implementações de tema em conflito**
+O AppHeader gerencia tema via `localStorage + classList`, enquanto SettingsPage tenta usar `next-themes`. Dois sistemas incompatíveis.
 
 ---
 
-### O que será implementado nesta sessão
+### Plano de correções
 
-#### FASE 1 — Correções Críticas de Banco (migrations)
-
-**Migration 1: Criar triggers ausentes + trigger de `handle_new_user`**
+#### Correção 1 — Trigger `on_auth_user_created` (nova migration)
+Criar migration correta sem o `IF NOT EXISTS` do `pg_trigger` que não funciona para triggers auth:
 ```sql
--- Trigger para profiles ao criar usuário
-CREATE TRIGGER on_auth_user_created
+CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Triggers updated_at em todas as tabelas
-CREATE TRIGGER update_projects_updated_at ...
-CREATE TRIGGER update_prompts_updated_at ...
-CREATE TRIGGER update_project_versions_updated_at ...
-CREATE TRIGGER update_templates_updated_at ...
-CREATE TRIGGER update_profiles_updated_at ...
+-- Triggers updated_at
+CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON public.projects FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_prompts_updated_at BEFORE UPDATE ON public.prompts FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_project_versions_updated_at BEFORE UPDATE ON public.project_versions FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_templates_updated_at BEFORE UPDATE ON public.templates FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 ```
 
-#### FASE 2 — Edge Functions novas (3 funções)
+#### Correção 2 — `AIContentTabWrapper` — fix variável `err` → `error`
+Linha 857–858 de `ProjectDetailPage.tsx`:
+```ts
+// ANTES (bug):
+} as { data: {...} | null; err?: unknown };
+if (err) throw err;
 
-**`generate-prompt`** — Gera prompts por tipo (10 tipos: frontend, backend, banco, deploy, MVP, mobile, testes, segurança, API, documentação). Recebe `{ project_id, prompt_type }`, retorna conteúdo via Gemini, salva na tabela `prompts` e retorna o objeto salvo.
+// DEPOIS (correto):
+const { data, error: invokeError } = await supabase.functions.invoke("generate-ai-content", {
+  body: { project_id: projectId, content_type: contentType },
+});
+if (invokeError) throw invokeError;
+```
 
-**`refine-idea`** — Recebe `{ idea }`, retorna a ideia refinada/expandida via Gemini. Usada no botão "Refinar com IA" da Etapa 1 do wizard.
+#### Correção 3 — Remover `next-themes` de `SettingsPage`
+Substituir `useTheme` de `next-themes` por hook customizado local que lê/escreve o mesmo `localStorage` e manipula classList que o AppHeader usa. Criar `useAppTheme()` hook compartilhado entre `AppHeader` e `SettingsPage`.
 
-**`generate-ai-content`** — Gera conteúdo para as abas Módulos, Telas, Banco de Dados e Regras de Negócio. Recebe `{ project_id, content_type }`, retorna texto estruturado Markdown.
+#### Correção 4 — Persistir conteúdo IA gerado nas abas durante sessão
+Mover o estado `content/isLoading/error` de `AIContentTabWrapper` para o componente pai `ProjectDetailPage`, indexado por `contentType`, usando `useRef` ou `useState` com mapa:
+```ts
+const [aiContent, setAiContent] = useState<Record<string, string | null>>({});
+```
 
-#### FASE 3 — Frontend — Funcionalidades que faltam
+#### Correção 5 — Aba "Exportações" em ProjectDetailPage
+Substituir `EmptyTab` por componente inline que gera e baixa a documentação do projeto específico (reutilizando a função `generateDoc` já existente em `ExportsPage`).
 
-**`NewProjectPage`** — Conectar botão "Refinar com IA" à Edge Function `refine-idea` com streaming visual (texto aparecendo progressivamente na textarea).
+#### Correção 6 — Corrigir setas de "Como Funciona" na LandingPage
+Remover as `div` de seta absolutas que não têm um elemento `relative` pai correto, ou converter a seção para usar `flex` com ícones de seta entre os passos.
 
-**`ProjectDetailPage`** — Implementar as 4 abas de geração:
-- "Módulos": botão "Gerar com IA" → chama `generate-ai-content` com `content_type: "modules"`
-- "Telas": botão "Gerar com IA" → `content_type: "screens"`
-- "Banco de Dados": botão "Gerar com IA" → `content_type: "database"`
-- "Regras": botão "Gerar com IA" → `content_type: "rules"`
-- "Avaliação" (aba "eval"): botão "Calcular Score" → chama `evaluate-project` e salva `quality_score` no banco
+#### Correção 7 — `PlansPage` — botões contextuais para usuário logado
+Ao invés de `/cadastro`, os CTAs em `PlansPage` devem mostrar "Plano atual" para o plano ativo e "Entrar em contato" para upgrade (pois não há integração com Stripe ainda), com visual diferente.
 
-**Novo componente `AIContentTab`** — Reutilizável para as abas de conteúdo gerado por IA: mostra estado vazio com botão "Gerar", loading com `AIStreamingIndicator`, resultado em Markdown formatado, botão Copiar, botão Regenerar.
+#### Correção 8 — `DashboardPage` — substituir "Projetos Ativos" por "Favoritos"
+Mostrar projetos favoritados ao invés de ativos — dado mais útil para a maioria dos usuários que tem projetos em rascunho.
 
-**Command Palette (Cmd+K)** — Implementar usando `cmdk` já instalado. Modal com busca de projetos, navegação rápida, ações como "Novo projeto", "Ver templates". Ativado por Cmd+K / Ctrl+K.
-
-**`PlansPage`** — Conectar ao plano real: ler `profiles.plan` via React Query e marcar o plano correto como "atual".
-
-**`EvaluationsPage`** — Adicionar Edge Function `evaluate-project` e botão "Avaliar com IA" nos cards de projetos sem score.
-
-#### FASE 4 — Gerador de Prompts completo (M09)
-
-**`PromptsPage`** — Adicionar seção de geração: seletor de projeto + seletor de tipo de prompt (10 tipos com ícones) + botão "Gerar Prompt" → chama `generate-prompt` → salva e recarrega lista.
-
-**Aba "Prompts" em `ProjectDetailPage`** — Adicionar botão "+ Gerar Prompt" que abre modal com seleção de tipo.
-
-**Edge Function `evaluate-project`** — Avalia o projeto em 7 dimensões (Escopo 0-100, Estrutura 0-100, Técnico 0-100, Completude 0-100, Viabilidade 0-100, Monetização 0-100, Maturidade 0-100), calcula score final, salva em `projects.quality_score` e retorna dimensões para radar chart em `EvaluationsPage`.
-
-#### FASE 5 — Polish e UX
-
-**`LandingPage`** — Adicionar seção "Como Funciona" com 3 passos animados. FAQ com Accordion do Radix já instalado. Animações de entrada no scroll com `framer-motion` `whileInView`.
+#### Correção 9 — `PromptsPage` — melhorar empty state e adicionar contador por tipo
+Empty state deve orientar o usuário a ir para um projeto e gerar. Adicionar badge de contagem por tipo de prompt (filtro por tipo).
 
 ---
 
 ### Arquivos a criar/modificar
 
-| Arquivo | Ação |
-|---|---|
-| `supabase/migrations/[ts]_triggers_fix.sql` | Criar — triggers reais no banco |
-| `supabase/functions/generate-prompt/index.ts` | Criar — M09 geração de prompts |
-| `supabase/functions/refine-idea/index.ts` | Criar — refinamento de ideia |
-| `supabase/functions/generate-ai-content/index.ts` | Criar — módulos/telas/banco/regras |
-| `supabase/functions/evaluate-project/index.ts` | Criar — score de qualidade |
-| `supabase/config.toml` | Editar — registrar 4 novas funções |
-| `src/components/CommandPalette.tsx` | Criar — Cmd+K com cmdk |
-| `src/components/AIContentTab.tsx` | Criar — aba reutilizável de conteúdo IA |
-| `src/pages/app/NewProjectPage.tsx` | Editar — conectar "Refinar com IA" |
-| `src/pages/app/ProjectDetailPage.tsx` | Editar — abas Módulos/Telas/DB/Regras/Avaliação + Command Palette |
-| `src/pages/app/PromptsPage.tsx` | Editar — adicionar gerador M09 |
-| `src/pages/app/EvaluationsPage.tsx` | Editar — botão "Avaliar" + radar chart |
-| `src/pages/app/PlansPage.tsx` | Editar — conectar plano real do usuário |
-| `src/pages/app/LandingPage.tsx` | Editar — Como Funciona + FAQ accordion |
-| `src/components/AppHeader.tsx` | Editar — ativar Command Palette |
+| Arquivo | Ação | Criticidade |
+|---|---|---|
+| `supabase/migrations/[ts]_triggers_final.sql` | Criar — triggers reais corretos | CRÍTICO |
+| `src/hooks/useAppTheme.ts` | Criar — hook compartilhado de tema | CRÍTICO |
+| `src/pages/app/ProjectDetailPage.tsx` | Editar — 3 bugs (AIContentTabWrapper erro + estado persistente + aba exports) | CRÍTICO |
+| `src/pages/app/SettingsPage.tsx` | Editar — remover next-themes, usar useAppTheme | CRÍTICO |
+| `src/components/AppHeader.tsx` | Editar — usar useAppTheme | MÉDIO |
+| `src/pages/LandingPage.tsx` | Editar — corrigir setas "Como Funciona" | MENOR |
+| `src/pages/app/PlansPage.tsx` | Editar — CTAs contextuais para usuário logado | MENOR |
+| `src/pages/app/DashboardPage.tsx` | Editar — "Favoritos" ao invés de "Ativos" | MENOR |
+| `src/pages/app/PromptsPage.tsx` | Editar — melhorar empty state + filtro por tipo | MENOR |
 
 ### Ordem de execução
-1. Migration triggers (crítico — resolve profiles e updated_at)
-2. Edge Functions (4 funções: generate-prompt, refine-idea, generate-ai-content, evaluate-project)
-3. Config.toml atualizado
-4. CommandPalette + AIContentTab (componentes base)
-5. ProjectDetailPage abas IA
-6. PromptsPage M09
-7. EvaluationsPage com score
-8. NewProjectPage refinar ideia
-9. PlansPage com plano real
-10. LandingPage polish
+1. Migration triggers (banco — crítico)
+2. Hook `useAppTheme` (base para correções 3 e 12)
+3. `AppHeader` com `useAppTheme`
+4. `SettingsPage` sem `next-themes`
+5. `ProjectDetailPage` — 3 correções simultâneas (AIContentTabWrapper bug, estado persistido, aba exports)
+6. `DashboardPage`, `PlansPage`, `PromptsPage`, `LandingPage` — polish final
