@@ -54,7 +54,9 @@ export function parseScreens(markdown: string): Array<{ name: string; descriptio
     /^#{2,3}\s+\d+[\.\)]\s+(.+(?:tela|screen|page|página|login|dashboard|painel|lista|detalhe|formulário|form|perfil|configuração|chat|notifica|onboard|cadastro|busca|search).*)$/i, // ## 1. Login Screen
     /^#{2,3}\s+Screen\s*[:–-]\s*(.+)$/i,                      // ## Screen: X
     /^#{2,3}\s+Página\s*[:–-]\s*(.+)$/i,                      // ## Página: X
-    /^#{2,3}\s+(.+)\s+(?:Screen|Tela|Page|Página)$/i,         // ## Login Screen
+    /^#{2,3}\s+Seção\s*[:–-]\s*(.+)$/i,                       // ## Seção: Hero
+    /^#{2,3}\s+\d+[\.\)]\s+(.+(?:home|sobre|contato|serviços|serviços|blog|portfólio|portfolio|hero|header|footer|depoimentos|preços|faq|equipe|galeria|parceiros).*)$/i, // ## 1. Home / ## 2. Sobre
+    /^#{2,3}\s+(.+)\s+(?:Screen|Tela|Page|Página|Seção)$/i,   // ## Login Screen / ## Hero Seção
     /^#{2,3}\s+(?:\d+[\.\)]\s+)?(\w[^#\n]{2,40})$/i,          // ## Dashboard / ## Login / ## Cadastro (generic short h2/h3)
   ];
 
