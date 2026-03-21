@@ -506,10 +506,10 @@ const ScreensWithMockups = ({
   onGenerate,
   initialMockups = {},
   onMockupSaved,
+  projectPlatform,
 }: ScreensWithMockupsProps) => {
   const [copied, setCopied] = useState(false);
   const [mockups, setMockups] = useState<Record<string, MockupState>>(() => {
-    // Initialize from persisted mockups
     const initial: Record<string, MockupState> = {};
     for (const [name, url] of Object.entries(initialMockups)) {
       initial[name] = { url, prevUrl: null, isLoading: false, error: null, persisted: true };
@@ -518,6 +518,12 @@ const ScreensWithMockups = ({
   });
   const [generateAllActive, setGenerateAllActive] = useState(false);
   const [generateAllProgress, setGenerateAllProgress] = useState({ current: 0, total: 0, name: "" });
+  const abortRef = useRef(false);
+
+  // Determine if mobile platform for aspect ratio
+  const isMobilePlatform = ["mobile", "ios", "android", "react native", "flutter"].some(
+    k => (projectPlatform ?? "").toLowerCase().includes(k)
+  );
   const abortRef = useRef(false);
 
   const handleCopy = async () => {
