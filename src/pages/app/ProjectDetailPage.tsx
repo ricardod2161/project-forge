@@ -1403,6 +1403,12 @@ const ProjectDetailPage = () => {
                 <span className={cn("px-2.5 py-1 rounded-full text-2xs font-semibold border", statusInfo.classes)}>
                   {statusInfo.label}
                 </span>
+                {isWebsite && (
+                  <span className="px-2.5 py-1 rounded-full text-2xs font-semibold bg-primary/10 text-primary border border-primary/25 flex items-center gap-1">
+                    <Globe className="w-2.5 h-2.5" />
+                    Site
+                  </span>
+                )}
                 {project.niche && (
                   <span className="px-2.5 py-1 rounded-full text-2xs font-medium bg-accent/10 text-accent border border-accent/20">
                     {project.niche}
