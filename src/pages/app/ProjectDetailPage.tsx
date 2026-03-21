@@ -1762,7 +1762,7 @@ const ProjectDetailPage = () => {
     structure:      !!aiContentCache["site_structure"],
     prompts:        (prompts?.length ?? 0) > 0,
     eval:           project.quality_score !== null,
-    versions:       true,
+    versions:       false,   // BUG 4 FIX: versions query lives in VersionsTab, default to false to avoid misleading dot
     exports:        true,
     ai:             false,
   };
