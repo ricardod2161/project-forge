@@ -1,93 +1,72 @@
 
-## Aba "Páginas" com mockups visuais (como a aba Telas dos sistemas)
+## Multi-Provider AI — Redução de Custos v1.0
 
-### Diagnóstico
+### O que será feito
 
-A aba **"Telas"** dos sistemas (modo `system`) já tem a experiência completa:
-1. Gera documentação via IA (`generate-ai-content` com `content_type: "screens"`)
-2. Faz parse da documentação para extrair nomes de telas
-3. Renderiza cards de mockup para cada tela com botão "Gerar Mockup"
-4. Usa `ScreensWithMockups` + `ScreensTabWrapper` para tudo isso
+Migrar 5 das 6 Edge Functions para provedores diretos (Groq, Google AI, OpenAI), mantendo `generate-screen-mockup` inalterada. Adicionar fallback automático Groq → Gemini. Criar arquivo `_shared/ai-providers.ts` com helpers reutilizáveis. Atualizar SettingsPage com seção de provedores. Atualizar `.env.example`.
 
-A aba **"Páginas"** dos sites (modo `website`) hoje usa apenas `AIContentTabWrapper` → renderiza só markdown de texto, sem mockups visuais.
+### Pré-requisito: Adicionar 3 secrets no backend
 
-### Solução
+Após aprovação, o usuário precisará adicionar no painel do backend (Lovable Cloud → Secrets):
+- `GROQ_API_KEY` — em console.groq.com (tier gratuito disponível)
+- `GOOGLE_AI_KEY` — em aistudio.google.com/apikey (tier gratuito: 1.500 req/dia)
+- `OPENAI_API_KEY` — em platform.openai.com/api-keys (pago, mas GPT-4o mini é muito barato)
 
-Criar um `PagesTabWrapper` para sites, análogo ao `ScreensTabWrapper` dos sistemas, mas adaptado para sites:
+`LOVABLE_API_KEY` já existe e continua sendo usado apenas em `generate-screen-mockup`.
 
-**1. Reutilizar `ScreensWithMockups`** — o componente já é genérico o suficiente. Basta passar:
-- `content_type: "site_pages"` na geração de texto
-- `platform_type: "Web"` no `generate-screen-mockup`
-- Um parser de seções de site (baseado nos padrões do conteúdo `site_pages`)
+---
 
-**2. Adaptar o parser de telas para sites** — o conteúdo gerado por `site_pages` usa cabeçalhos como:
-```
-## Página: Home / ## 1. Home / ## Seção: Hero / ## Página Principal
-```
-O `parseScreens` existente já cobre alguns padrões com `## Página: X`. Precisa garantir que também cubra `## 1. Home`, `## Seção: Hero`, etc.
+### Arquivos alterados
 
-**3. Criar `PagesTabWrapper`** em `ProjectDetailPage.tsx`, análogo ao `ScreensTabWrapper`:
-```tsx
-const PagesTabWrapper = ({
-  projectId,
-  persistedContent,
-  onContentGenerated,
-  projectMetadata,
-  onUpdateMetadata,
-}: ...) => {
-  // Mesma lógica de ScreensTabWrapper mas com:
-  // - content_type: "site_pages"
-  // - titulo e descrição adaptados para sites
-  // - plataforma: "Web" (sempre desktop)
-};
-```
+**1. `supabase/functions/_shared/ai-providers.ts`** (novo)
+- `callAIWithFallback(systemPrompt, userPrompt, maxTokens, temperature)` — tenta Groq 70B, faz fallback automático para Gemini 2.0 Flash se rate limit (429)
+- `callGemini(prompt, options)` — Google AI direto com formato nativo
+- `callOpenAIWithTools(systemPrompt, userPrompt, tools, toolChoice)` — OpenAI com tool calling
 
-**4. Substituir no render** — linha 1540:
-```tsx
-// Antes:
-{activeTab === "pages" && isWebsite && <AIContentTabWrapper ... contentType="site_pages" .../>}
+**2. `supabase/functions/refine-idea/index.ts`**
+- Trocar `LOVABLE_API_KEY` + gateway por `callAIWithFallback` com modelo `llama-3.1-8b-instant` (Groq 8B)
+- Remover verificação de 402, ajustar mensagem 429 para Groq
 
-// Depois:
-{activeTab === "pages" && isWebsite && <PagesTabWrapper
-  projectId={project.id}
-  persistedContent={aiContentCache["site_pages"] ?? null}
-  onContentGenerated={handleContentGenerated}
-  projectMetadata={(project.metadata as Record<string, unknown>) ?? {}}
-  onUpdateMetadata={(patch) => updateProject.mutate({ metadata: patch as never, _silent: true } as never)}
-/>}
-```
+**3. `supabase/functions/generate-prompt/index.ts`**
+- Trocar fetch do gateway por `callAIWithFallback` com Groq 70B + fallback Gemini
+- `max_tokens: 4096`, `temperature: 0.6`
+- Remover verificação de 402
 
-**5. Textos em português no `ScreensWithMockups`** — o componente já está em PT-BR exceto alguns detalhes. Verificar que os textos "Telas" → "Páginas" e "Tela" → "Seção" aparecem corretos. Para isso, vamos adicionar props opcionais:
-```tsx
-interface ScreensWithMockupsProps {
-  // ...existing...
-  sectionLabel?: string;       // "tela" ou "seção/página"
-  emptyTitle?: string;         // override do título do empty state
-  emptyDescription?: string;   // override da descrição
-}
-```
+**4. `supabase/functions/generate-ai-content/index.ts`**
+- Trocar gateway por `callGemini()` direto (Google AI nativo)
+- Formato de resposta muda: `candidates[0].content.parts[0].text` em vez de `choices[0].message.content`
+- Remover `modelForContentType` (não mais necessário)
+- Tratar erros 403 (chave inválida), 429 (rate limit)
 
-### Arquivo alterado
+**5. `supabase/functions/evaluate-project/index.ts`**
+- Trocar gateway por OpenAI API diretamente (`gpt-4o-mini`)
+- Manter todo o schema de `tools` e `tool_choice` — apenas a URL, key e model mudam
+- `temperature: 0.3`, `max_tokens: 2000`
+- Erros 401/402 → mensagem sobre OPENAI_API_KEY
 
-Apenas **`src/pages/app/ProjectDetailPage.tsx`** — adicionar `PagesTabWrapper` (≈50 linhas) e substituir o render da aba `pages` na linha 1540.
+**6. `supabase/functions/review-project/index.ts`**
+- Trocar gateway por `callAIWithFallback` com Groq 70B + fallback Gemini
+- `temperature: 0.5`, `max_tokens: 4096`
+- Manter tool calling para `submit_review_findings` intacto
 
-Opcionalmente, pequeno ajuste em `src/components/ScreensWithMockups.tsx` para aceitar `sectionLabel` prop e trocar "tela(s)" → "seção/seções" quando for modo site.
+**7. `supabase/functions/generate-screen-mockup/index.ts`** — NÃO ALTERAR
 
-### Resultado visual
+**8. `src/pages/app/SettingsPage.tsx`**
+- Adicionar `AIProvidersSection` componente (visual only, sem formulário)
+- 4 linhas de provedores: Groq (gratuito), Google AI (gratuito), OpenAI (pago), Lovable Gateway (mockups)
+- Inserir na coluna direita do grid, logo abaixo de `AIPreferencesSection`
+- Import `Zap` já existe; adicionar se necessário
 
-A aba "Páginas" ficará igual à aba "Telas" dos sistemas:
-```
-┌─────────────────────────────────────────────────────┐
-│ 🤖 Gerado por IA  [5 seções] [2/5 mockups]  [Copiar][Regenerar] │
-├─────────────────────────────────────────────────────┤
-│ Documentação das páginas (markdown)                  │
-├─────────────────────────────────────────────────────┤
-│ 🖼 Mockups Visuais                    [Gerar Todos (3)] │
-│ ┌──────────┐  ┌──────────┐  ┌──────────┐           │
-│ │  Hero    │  │  Sobre   │  │  Serv.   │           │
-│ │ [imagem] │  │ [Gerar]  │  │ [Gerar]  │           │
-│ └──────────┘  └──────────┘  └──────────┘           │
-└─────────────────────────────────────────────────────┘
-```
+**9. `.env.example`**
+- Adicionar as 3 novas keys documentadas com comentários PT-BR
 
-Cada card: imagem gerada pela IA do visual da seção/página, com lightbox, download e regenerar.
+---
+
+### Nota sobre review-project + tool calling no Groq
+
+`review-project` usa `tool_choice` com tool calling. Groq suporta function calling, porém o fallback `callAIWithFallback` retorna texto puro. Para esta função, o tool calling será feito diretamente no Groq com fallback apenas para texto simples se necessário. Alternativa mais robusta: usar diretamente `callGroq` com o corpo completo incluindo `tools`.
+
+### Economia esperada
+- Before: tudo via Lovable Gateway com markup
+- After: Groq free tier + Google AI free tier + OpenAI gpt-4o-mini (baratíssimo)
+- Estimativa: 65-70% de redução de custo
