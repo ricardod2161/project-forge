@@ -568,7 +568,6 @@ const ScreensWithMockups = ({
     for (const screen of pendingScreens) {
       if (abortRef.current) break;
       setGenerateAllProgress({ current: done, total: pendingScreens.length, name: screen.name });
-      // Set loading on this card
       setMockups(prev => ({
         ...prev,
         [screen.name]: { ...( prev[screen.name] ?? { url: null, prevUrl: null, error: null, persisted: false }), isLoading: true },
@@ -580,6 +579,7 @@ const ScreensWithMockups = ({
             project_id: projectId,
             screen_name: screen.name,
             screen_description: screen.description,
+            platform_type: projectPlatform,
           },
         });
         if (!error && data?.image_url) {
@@ -600,7 +600,7 @@ const ScreensWithMockups = ({
       }
 
       // Delay to avoid rate limiting
-      if (!abortRef.current) await new Promise((r) => setTimeout(r, 2000));
+      if (!abortRef.current) await new Promise((r) => setTimeout(r, 2500));
     }
 
     setGenerateAllActive(false);
