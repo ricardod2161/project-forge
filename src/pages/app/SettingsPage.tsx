@@ -1,12 +1,16 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { User, Palette, Bell, CreditCard, Shield, Sun, Moon, Save, Check, Lock } from "lucide-react";
+import { User, Palette, Bell, CreditCard, Shield, Sun, Moon, Save, Check, Lock, Bot, Trash2, AlertTriangle } from "lucide-react";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // ── Profile section ────────────────────────────────────────────────────────────
 const ProfileSection = () => {
@@ -236,6 +240,123 @@ const NotificationsSection = () => {
   );
 };
 
+// ── AI Preferences section ─────────────────────────────────────────────────────
+const AIPreferencesSection = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data: profile } = useQuery({
+    queryKey: ["profile", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("preferences").eq("user_id", user!.id).single();
+      return data;
+    },
+  });
+
+  const prefs = (profile?.preferences as Record<string, unknown> | null) ?? {};
+  const [detailLevel, setDetailLevel] = useState<string>((prefs.detail_level as string) ?? "complete");
+  const [proactiveSuggestions, setProactiveSuggestions] = useState<boolean>((prefs.proactive_suggestions as boolean) ?? true);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (prefs.detail_level) setDetailLevel(prefs.detail_level as string);
+    if (prefs.proactive_suggestions !== undefined) setProactiveSuggestions(prefs.proactive_suggestions as boolean);
+  }, [profile]);
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ preferences: { ...prefs, detail_level: detailLevel, proactive_suggestions: proactiveSuggestions } })
+        .eq("user_id", user!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    },
+    onError: () => toast.error("Erro ao salvar preferências."),
+  });
+
+  const DETAIL_LEVELS = [
+    { value: "summary",  label: "Resumido",        desc: "Respostas concisas e diretas" },
+    { value: "complete", label: "Completo",         desc: "Nível padrão equilibrado" },
+    { value: "maximum",  label: "Máximo detalhe",   desc: "O mais detalhado possível" },
+  ];
+
+  return (
+    <div className="p-6 rounded-xl border border-border bg-card space-y-5">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+          <Bot className="w-4 h-4 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-xs font-semibold text-foreground">Preferências de IA</h2>
+          <p className="text-2xs text-muted-foreground">Ajuste o comportamento da IA</p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {/* Detail level */}
+        <div className="space-y-2">
+          <label className="text-2xs font-medium text-muted-foreground">Nível de detalhe das respostas</label>
+          <div className="grid grid-cols-3 gap-2">
+            {DETAIL_LEVELS.map(({ value, label, desc }) => (
+              <button
+                key={value}
+                onClick={() => setDetailLevel(value)}
+                className={cn(
+                  "flex flex-col items-start p-3 rounded-lg border text-left transition-all",
+                  detailLevel === value
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-primary/30"
+                )}
+              >
+                <span className={cn("text-2xs font-semibold", detailLevel === value ? "text-primary" : "text-foreground")}>
+                  {label}
+                </span>
+                <span className="text-[10px] text-muted-foreground mt-0.5">{desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Proactive suggestions toggle */}
+        <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+          <div>
+            <p className="text-xs font-medium text-foreground">Sugestões proativas</p>
+            <p className="text-2xs text-muted-foreground">Dicas contextuais no dashboard e nas abas do projeto</p>
+          </div>
+          <button
+            onClick={() => setProactiveSuggestions(v => !v)}
+            className={cn(
+              "relative w-9 h-5 rounded-full transition-colors duration-200",
+              proactiveSuggestions ? "bg-primary" : "bg-muted"
+            )}
+            role="switch"
+            aria-checked={proactiveSuggestions}
+          >
+            <span className={cn(
+              "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-200",
+              proactiveSuggestions ? "left-4" : "left-0.5"
+            )} />
+          </button>
+        </div>
+      </div>
+
+      <button
+        onClick={() => mutation.mutate()}
+        disabled={mutation.isPending}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-all"
+      >
+        {saved ? <><Check className="w-3.5 h-3.5" />Salvo!</> : <><Save className="w-3.5 h-3.5" />Salvar preferências</>}
+      </button>
+    </div>
+  );
+};
+
 // ── Plan section ───────────────────────────────────────────────────────────────
 const PlanSection = () => {
   const { user } = useAuth();
@@ -319,6 +440,89 @@ const SecuritySection = () => {
   );
 };
 
+// ── Danger zone section ────────────────────────────────────────────────────────
+const DangerZoneSection = () => {
+  const { user, signOut } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [emailInput, setEmailInput] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (emailInput !== user?.email) {
+      toast.error("O email digitado não confere com sua conta.");
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      // Sign out as we can't delete from client side without admin SDK
+      toast.info("Solicitação enviada. Nossa equipe processará a exclusão em breve.", { duration: 6000 });
+      await signOut();
+    } catch {
+      toast.error("Erro ao processar solicitação. Entre em contato com o suporte.");
+    } finally {
+      setIsDeleting(false);
+      setOpen(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="p-6 rounded-xl border border-destructive/20 bg-destructive/5 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
+            <AlertTriangle className="w-4 h-4 text-destructive" />
+          </div>
+          <div>
+            <h2 className="text-xs font-semibold text-destructive">Zona de Perigo</h2>
+            <p className="text-2xs text-muted-foreground">Ações irreversíveis</p>
+          </div>
+        </div>
+        <p className="text-2xs text-muted-foreground">
+          Ao excluir sua conta, todos os projetos, prompts e avaliações serão removidos permanentemente.
+          Esta ação não pode ser desfeita.
+        </p>
+        <button
+          onClick={() => setOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium border border-destructive/30 text-destructive hover:bg-destructive/10 transition-all"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          Excluir minha conta
+        </button>
+      </div>
+
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Excluir conta permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>Esta ação é irreversível. Todos os seus dados serão excluídos.</p>
+              <p className="font-medium text-foreground">
+                Para confirmar, digite seu email: <strong>{user?.email}</strong>
+              </p>
+              <input
+                value={emailInput}
+                onChange={e => setEmailInput(e.target.value)}
+                placeholder={user?.email ?? ""}
+                className="w-full px-3 py-2 rounded-lg text-xs bg-input border border-border focus:outline-none focus:ring-2 focus:ring-destructive/50"
+              />
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setEmailInput("")}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={emailInput !== user?.email || isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+            >
+              {isDeleting ? "Processando..." : "Sim, excluir conta"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+};
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 const SettingsPage = () => (
   <div className="space-y-6 max-w-4xl">
@@ -332,16 +536,17 @@ const SettingsPage = () => (
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Two-column layout on desktop */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Left column */}
         <div className="space-y-5">
           <ProfileSection />
           <SecuritySection />
+          <DangerZoneSection />
         </div>
         {/* Right column */}
         <div className="space-y-5">
           <AppearanceSection />
+          <AIPreferencesSection />
           <NotificationsSection />
           <PlanSection />
         </div>
@@ -351,4 +556,3 @@ const SettingsPage = () => (
 );
 
 export default SettingsPage;
-

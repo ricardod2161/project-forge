@@ -1,5 +1,5 @@
-import { useState, KeyboardEvent } from "react";
-import { ArrowLeft, Sparkles, X, Check, Plus, Loader2 } from "lucide-react";
+import { useState, useEffect, KeyboardEvent } from "react";
+import { ArrowLeft, Sparkles, X, Check, Plus, Loader2, Save } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useProjectWizard } from "@/hooks/useProjectWizard";
@@ -11,6 +11,8 @@ import { toast } from "sonner";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STEPS = ["Ideia", "Classificação", "Detalhamento", "Confirmação"];
+const IDEA_MIN_CHARS = 30;
+const AUDIENCE_MIN_CHARS = 10;
 
 const PROJECT_TYPES = [
   { value: "saas", label: "SaaS", emoji: "☁️", desc: "Software como serviço" },
@@ -43,11 +45,29 @@ const INTEGRATIONS_LIST = [
   "Firebase", "Google Analytics", "Zapier", "OpenAI", "Twilio",
 ];
 
+// ─── Auto-save indicator ──────────────────────────────────────────────────────
+
+const AutoSaveIndicator = ({ lastSaved }: { lastSaved: Date | null }) => {
+  if (!lastSaved) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 border border-success/20 text-2xs text-success"
+    >
+      <Save className="w-2.5 h-2.5" />
+      Salvo automaticamente
+    </motion.div>
+  );
+};
+
 // ─── Step Components ──────────────────────────────────────────────────────────
 
 const StepIdeia = () => {
   const { idea, setIdea, nextStep } = useProjectWizard();
   const [isRefining, setIsRefining] = useState(false);
+  const isValid = idea.trim().length >= IDEA_MIN_CHARS;
 
   const handleRefineWithAI = async () => {
     if (idea.trim().length < 20) {
@@ -74,7 +94,7 @@ const StepIdeia = () => {
         setIdea(data.refined);
         toast.success("Ideia refinada com sucesso!");
       }
-    } catch (err) {
+    } catch {
       toast.error("Erro ao refinar ideia. Tente novamente.");
     } finally {
       setIsRefining(false);
@@ -94,14 +114,32 @@ const StepIdeia = () => {
           placeholder="Ex: Um sistema de agendamento para barbearias com múltiplos profissionais, controle de estoque de produtos, caixa integrado e app para clientes acompanharem fila em tempo real..."
           className={cn(
             "w-full h-40 px-4 py-3 rounded-lg text-xs resize-none",
-            "bg-input border border-border text-foreground placeholder:text-muted-foreground",
-            "focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+            "bg-input border text-foreground placeholder:text-muted-foreground",
+            "focus:outline-none focus:ring-2 focus:ring-ring transition-all",
+            idea.trim().length > 0 && !isValid
+              ? "border-warning/50 focus:ring-warning/30"
+              : "border-border"
           )}
         />
-        <span className="absolute bottom-3 right-3 text-2xs text-muted-foreground">
-          {idea.length} chars
+        <span className={cn(
+          "absolute bottom-3 right-3 text-2xs",
+          isValid ? "text-success" : "text-muted-foreground"
+        )}>
+          {idea.trim().length}/{IDEA_MIN_CHARS} chars mín.
         </span>
       </div>
+
+      {/* Inline validation message */}
+      <AnimatePresence>
+        {idea.trim().length > 0 && !isValid && (
+          <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="text-2xs text-warning flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-warning inline-block" />
+            Descreva mais sua ideia (mín. {IDEA_MIN_CHARS} caracteres) para continuar.
+          </motion.p>
+        )}
+      </AnimatePresence>
+
       <div className="flex items-center justify-between">
         <button
           onClick={handleRefineWithAI}
@@ -120,7 +158,7 @@ const StepIdeia = () => {
         </button>
         <button
           onClick={nextStep}
-          disabled={idea.trim().length < 20}
+          disabled={!isValid}
           className={cn(
             "px-6 py-2 rounded-lg text-xs font-semibold transition-all",
             "bg-gradient-primary text-primary-foreground hover:shadow-glow",
@@ -130,9 +168,6 @@ const StepIdeia = () => {
           Próximo →
         </button>
       </div>
-      {idea.trim().length > 0 && idea.trim().length < 20 && (
-        <p className="text-2xs text-muted-foreground">Escreva pelo menos 20 caracteres para continuar.</p>
-      )}
     </div>
   );
 };
@@ -146,6 +181,17 @@ const StepClassificacao = () => {
     nextStep, prevStep,
   } = useProjectWizard();
 
+  const isValid = !!type && !!niche && !!platform;
+  const [attempted, setAttempted] = useState(false);
+
+  const handleNext = () => {
+    if (!isValid) {
+      setAttempted(true);
+      return;
+    }
+    nextStep();
+  };
+
   return (
     <div className="p-8 rounded-xl border border-border bg-card space-y-6">
       <div>
@@ -155,7 +201,10 @@ const StepClassificacao = () => {
 
       {/* Tipo */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-foreground">Tipo de projeto</label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium text-foreground">Tipo de projeto</label>
+          {attempted && !type && <span className="text-2xs text-warning">Selecione um tipo</span>}
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {PROJECT_TYPES.map((pt) => (
             <button
@@ -165,7 +214,9 @@ const StepClassificacao = () => {
                 "flex flex-col items-start p-3 rounded-lg border text-left transition-all",
                 type === pt.value
                   ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-surface/30 hover:border-primary/30 text-foreground"
+                  : attempted && !type
+                    ? "border-warning/40 bg-warning/5 hover:border-warning/60 text-foreground"
+                    : "border-border bg-surface/30 hover:border-primary/30 text-foreground"
               )}
             >
               <span className="text-base mb-1">{pt.emoji}</span>
@@ -178,7 +229,10 @@ const StepClassificacao = () => {
 
       {/* Nicho */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-foreground">Nicho / Setor</label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium text-foreground">Nicho / Setor</label>
+          {attempted && !niche && <span className="text-2xs text-warning">Selecione um nicho</span>}
+        </div>
         <div className="flex flex-wrap gap-2">
           {NICHES.map((n) => (
             <button
@@ -188,7 +242,9 @@ const StepClassificacao = () => {
                 "px-3 py-1.5 rounded-full text-2xs font-medium border transition-all",
                 niche === n
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-surface/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  : attempted && !niche
+                    ? "border-warning/40 bg-warning/5 text-muted-foreground hover:border-warning/60 hover:text-foreground"
+                    : "border-border bg-surface/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
               )}
             >
               {n}
@@ -220,7 +276,10 @@ const StepClassificacao = () => {
 
       {/* Plataforma */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-foreground">Plataforma alvo</label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium text-foreground">Plataforma alvo</label>
+          {attempted && !platform && <span className="text-2xs text-warning">Selecione uma plataforma</span>}
+        </div>
         <div className="flex flex-wrap gap-2">
           {PLATFORMS.map((p) => (
             <button
@@ -230,7 +289,9 @@ const StepClassificacao = () => {
                 "px-3 py-1.5 rounded-full text-2xs font-medium border transition-all",
                 platform === p
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-surface/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  : attempted && !platform
+                    ? "border-warning/40 bg-warning/5 text-muted-foreground hover:border-warning/60 hover:text-foreground"
+                    : "border-border bg-surface/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
               )}
             >
               {p}
@@ -247,12 +308,11 @@ const StepClassificacao = () => {
           ← Voltar
         </button>
         <button
-          onClick={nextStep}
-          disabled={!type || !niche || !platform}
+          onClick={handleNext}
           className={cn(
             "px-6 py-2 rounded-lg text-xs font-semibold transition-all",
             "bg-gradient-primary text-primary-foreground hover:shadow-glow",
-            "disabled:opacity-40 disabled:cursor-not-allowed"
+            !isValid && "opacity-60"
           )}
         >
           Próximo →
@@ -272,6 +332,8 @@ const StepDetalhamento = () => {
   } = useProjectWizard();
 
   const [featureInput, setFeatureInput] = useState("");
+  const [attempted, setAttempted] = useState(false);
+  const isAudienceValid = audience.trim().length >= AUDIENCE_MIN_CHARS;
 
   const handleAddFeature = () => {
     if (featureInput.trim()) {
@@ -287,6 +349,14 @@ const StepDetalhamento = () => {
     }
   };
 
+  const handleNext = () => {
+    if (!isAudienceValid) {
+      setAttempted(true);
+      return;
+    }
+    nextStep();
+  };
+
   return (
     <div className="p-8 rounded-xl border border-border bg-card space-y-6">
       <div>
@@ -296,17 +366,36 @@ const StepDetalhamento = () => {
 
       {/* Público-alvo */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-foreground">Público-alvo</label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium text-foreground">Público-alvo</label>
+          {attempted && !isAudienceValid && (
+            <span className="text-2xs text-warning">Mínimo {AUDIENCE_MIN_CHARS} caracteres</span>
+          )}
+        </div>
         <textarea
           value={audience}
           onChange={(e) => setAudience(e.target.value)}
           placeholder="Ex: Donos de barbearias de pequeno e médio porte, sem conhecimento técnico..."
           className={cn(
             "w-full h-24 px-4 py-3 rounded-lg text-xs resize-none",
-            "bg-input border border-border text-foreground placeholder:text-muted-foreground",
-            "focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+            "bg-input border text-foreground placeholder:text-muted-foreground",
+            "focus:outline-none focus:ring-2 focus:ring-ring transition-all",
+            attempted && !isAudienceValid ? "border-warning/50 focus:ring-warning/30" : "border-border"
           )}
         />
+        <div className="flex justify-between">
+          <AnimatePresence>
+            {attempted && !isAudienceValid && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="text-2xs text-warning">
+                Descreva o público-alvo com mais detalhes para continuar.
+              </motion.p>
+            )}
+          </AnimatePresence>
+          <span className={cn("text-2xs ml-auto", isAudienceValid ? "text-success" : "text-muted-foreground")}>
+            {audience.trim().length}/{AUDIENCE_MIN_CHARS}
+          </span>
+        </div>
       </div>
 
       {/* Funcionalidades */}
@@ -403,10 +492,11 @@ const StepDetalhamento = () => {
           ← Voltar
         </button>
         <button
-          onClick={nextStep}
+          onClick={handleNext}
           className={cn(
             "px-6 py-2 rounded-lg text-xs font-semibold transition-all",
-            "bg-gradient-primary text-primary-foreground hover:shadow-glow"
+            "bg-gradient-primary text-primary-foreground hover:shadow-glow",
+            !isAudienceValid && "opacity-60"
           )}
         >
           Próximo →
@@ -416,6 +506,13 @@ const StepDetalhamento = () => {
   );
 };
 
+const LOADING_MESSAGES = [
+  "Analisando sua ideia...",
+  "Identificando módulos e funcionalidades...",
+  "Estruturando a arquitetura do sistema...",
+  "Salvando projeto no banco de dados...",
+];
+
 const StepConfirmacao = () => {
   const {
     idea, type, niche, complexity, platform,
@@ -424,6 +521,15 @@ const StepConfirmacao = () => {
   } = useProjectWizard();
 
   const { mutate: createProject, isPending } = useCreateProject();
+  const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
+
+  useEffect(() => {
+    if (!isPending) return;
+    const interval = setInterval(() => {
+      setLoadingMsgIdx(i => (i + 1) % LOADING_MESSAGES.length);
+    }, 2200);
+    return () => clearInterval(interval);
+  }, [isPending]);
 
   const derivedTitle = title || `${niche ? niche + " — " : ""}${
     PROJECT_TYPES.find((t) => t.value === type)?.label ?? "Projeto"
@@ -463,39 +569,41 @@ const StepConfirmacao = () => {
     <div className="p-8 rounded-xl border border-border bg-card space-y-6">
       <div>
         <h2 className="font-display font-semibold text-sm text-foreground mb-1">Confirme os dados</h2>
-        <p className="text-muted-foreground text-xs">Revise tudo antes de criar o projeto.</p>
+        <p className="text-muted-foreground text-xs">Revise e confirme antes de gerar o projeto.</p>
       </div>
 
       {/* Título editável */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <label className="text-xs font-medium text-foreground">Nome do projeto</label>
         <input
           value={title || derivedTitle}
-          onChange={(e) => setTitle(e.target.value)}
-          className={cn(
-            "w-full px-4 py-2.5 rounded-lg text-xs font-semibold",
-            "bg-input border border-border text-foreground",
-            "focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-          )}
+          onChange={e => setTitle(e.target.value)}
+          placeholder={derivedTitle}
+          className="w-full px-4 py-2.5 rounded-lg text-xs bg-input border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />
-        <p className="text-2xs text-muted-foreground">Você pode editar o nome do projeto aqui.</p>
       </div>
 
-      {/* Resumo */}
-      <div className="p-4 rounded-lg bg-surface/50 border border-border space-y-3">
-        <h3 className="text-2xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-          Resumo
-        </h3>
-        <Section label="Ideia" value={idea.slice(0, 120) + (idea.length > 120 ? "…" : "")} />
-        <Section label="Tipo" value={PROJECT_TYPES.find((t) => t.value === type)?.label ?? type} />
+      {/* Resumo dos dados */}
+      <div className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
+        <Section label="Tipo" value={PROJECT_TYPES.find(t => t.value === type)?.label ?? type} />
         <Section label="Nicho" value={niche} />
-        <Section label="Complexidade" value={`${complexity}/5`} />
         <Section label="Plataforma" value={platform} />
-        <Section label="Público-alvo" value={audience} />
-        <Section label="Funcionalidades" value={features} />
-        <Section label="Monetização" value={MONETIZATIONS.find((m) => m.value === monetization)?.label ?? monetization} />
-        <Section label="Integrações" value={integrations} />
+        <Section label="Complexidade" value={`${complexity}/5`} />
+        {audience && <Section label="Público-alvo" value={audience} />}
+        {features.length > 0 && <Section label="Funcionalidades" value={features} />}
+        {monetization && <Section label="Monetização" value={monetization} />}
+        {integrations.length > 0 && <Section label="Integrações" value={integrations} />}
       </div>
+
+      {/* Ideia resumida */}
+      {idea && (
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Ideia original</label>
+          <p className="text-xs text-foreground leading-relaxed line-clamp-4 bg-muted/20 rounded-lg p-3 border border-border">
+            {idea}
+          </p>
+        </div>
+      )}
 
       <div className="flex justify-between pt-2">
         <button
@@ -509,24 +617,31 @@ const StepConfirmacao = () => {
           onClick={handleCreate}
           disabled={isPending}
           className={cn(
-            "flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-semibold transition-all",
+            "flex items-center gap-2 px-6 py-2.5 rounded-lg text-xs font-semibold transition-all min-w-[160px] justify-center",
             "bg-gradient-primary text-primary-foreground hover:shadow-glow",
-            "disabled:opacity-60 disabled:cursor-wait"
+            "disabled:cursor-not-allowed disabled:shadow-none disabled:opacity-90"
           )}
         >
           {isPending ? (
             <>
-              <motion.div
-                className="w-3.5 h-3.5 rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-              />
-              Criando…
+              <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={loadingMsgIdx}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.25 }}
+                  className="truncate"
+                >
+                  {LOADING_MESSAGES[loadingMsgIdx]}
+                </motion.span>
+              </AnimatePresence>
             </>
           ) : (
             <>
               <Sparkles className="w-3.5 h-3.5" />
-              Criar Projeto
+              Gerar Projeto
             </>
           )}
         </button>
@@ -535,87 +650,92 @@ const StepConfirmacao = () => {
   );
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 const NewProjectPage = () => {
-  const { currentStep, setStep } = useProjectWizard();
+  const { currentStep, idea, type, niche, audience } = useProjectWizard();
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+  // Auto-save indicator — triggers whenever wizard state changes
+  useEffect(() => {
+    if (!idea && !type) return;
+    const timer = setTimeout(() => setLastSaved(new Date()), 800);
+    return () => clearTimeout(timer);
+  }, [idea, type, niche, audience]);
 
   const stepComponents = [
-    <StepIdeia key="ideia" />,
-    <StepClassificacao key="classificacao" />,
-    <StepDetalhamento key="detalhamento" />,
-    <StepConfirmacao key="confirmacao" />,
+    <StepIdeia key="0" />,
+    <StepClassificacao key="1" />,
+    <StepDetalhamento key="2" />,
+    <StepConfirmacao key="3" />,
   ];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
+    <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between">
         <Link
           to="/app/projetos"
-          className="text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-2xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Voltar para projetos
         </Link>
-        <div>
-          <h1 className="font-display font-bold text-xl text-foreground">Novo Projeto</h1>
-          <p className="text-muted-foreground text-xs mt-0.5">Wizard inteligente de criação</p>
-        </div>
+        <AnimatePresence>
+          <AutoSaveIndicator lastSaved={lastSaved} />
+        </AnimatePresence>
       </div>
 
-      {/* Progress */}
-      <div className="space-y-3">
-        <div className="flex items-center">
-          {STEPS.map((step, i) => (
-            <div key={step} className="flex items-center flex-1 last:flex-none">
-              <button
-                onClick={() => i < currentStep && setStep(i)}
-                disabled={i > currentStep}
-                className={cn(
-                  "w-7 h-7 rounded-full flex items-center justify-center text-2xs font-bold border-2 transition-all flex-shrink-0",
-                  i === currentStep
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : i < currentStep
-                    ? "border-success bg-success text-success-foreground cursor-pointer"
-                    : "border-border bg-surface text-muted-foreground"
-                )}
-              >
+      <div>
+        <h1 className="font-display font-bold text-xl text-foreground">Novo Projeto</h1>
+        <p className="text-muted-foreground text-xs mt-0.5">
+          Descreva sua ideia e a IA irá estruturar o projeto completo para você.
+        </p>
+      </div>
+
+      {/* Progress steps */}
+      <div className="flex items-center gap-0">
+        {STEPS.map((step, i) => (
+          <div key={step} className="flex items-center flex-1">
+            <div className={cn(
+              "flex items-center gap-1.5 flex-1",
+              i < currentStep ? "opacity-60" : ""
+            )}>
+              <div className={cn(
+                "w-6 h-6 rounded-full flex items-center justify-center text-2xs font-bold border-2 transition-all flex-shrink-0",
+                i < currentStep
+                  ? "bg-success border-success text-white"
+                  : i === currentStep
+                    ? "bg-primary border-primary text-primary-foreground"
+                    : "bg-transparent border-border text-muted-foreground"
+              )}>
                 {i < currentStep ? <Check className="w-3 h-3" /> : i + 1}
-              </button>
-              {i < STEPS.length - 1 && (
-                <div
-                  className={cn(
-                    "flex-1 h-px mx-2 transition-colors",
-                    i < currentStep ? "bg-success" : "bg-border"
-                  )}
-                />
-              )}
+              </div>
+              <span className={cn(
+                "text-2xs font-medium hidden sm:block",
+                i === currentStep ? "text-foreground" : "text-muted-foreground"
+              )}>
+                {step}
+              </span>
             </div>
-          ))}
-        </div>
-        <div className="flex justify-between">
-          {STEPS.map((step, i) => (
-            <span
-              key={step}
-              className={cn(
-                "text-2xs",
-                i === currentStep ? "text-primary font-semibold" : "text-muted-foreground"
-              )}
-            >
-              {step}
-            </span>
-          ))}
-        </div>
+            {i < STEPS.length - 1 && (
+              <div className={cn(
+                "h-px flex-1 mx-2 transition-all",
+                i < currentStep ? "bg-success/60" : "bg-border"
+              )} />
+            )}
+          </div>
+        ))}
       </div>
 
-      {/* Step Content */}
+      {/* Step content with animation */}
       <AnimatePresence mode="wait">
         <motion.div
           key={currentStep}
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: 0.25 }}
         >
           {stepComponents[currentStep]}
         </motion.div>

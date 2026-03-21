@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, Copy, Check, FileText, ChevronDown, Package, Code, FileJson } from "lucide-react";
+import { Download, Copy, Check, FileText, ChevronDown, Package, Code, FileJson, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProjects, type Project } from "@/hooks/useProjects";
+import { useProjectPrompts } from "@/hooks/useProjectDetail";
 import { Skeleton } from "@/components/ui/skeleton";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
@@ -68,20 +69,135 @@ const generateJSON = (project: Project): string =>
     2
   );
 
-type ExportFormat = "markdown" | "json";
+// ── Prompts Markdown generator ─────────────────────────────────────────────
+interface Prompt {
+  id: string;
+  type: string;
+  title: string;
+  content: string | null;
+  version: number;
+  tokens_estimate: number | null;
+  platform: string | null;
+  created_at: string;
+}
 
+const generatePromptsMarkdown = (project: Project, prompts: Prompt[]): string => {
+  if (!prompts.length) return `# ${project.title} — Prompts Gerados\n\nNenhum prompt gerado para este projeto ainda.`;
+  const lines: string[] = [];
+  const line = (s: string) => lines.push(s);
+  const br = () => lines.push("");
+
+  line(`# ${project.title} — Prompts Gerados`);
+  br();
+  line(`**Total de prompts:** ${prompts.length}`);
+  line(`**Tokens totais estimados:** ${prompts.reduce((s, p) => s + (p.tokens_estimate ?? 0), 0).toLocaleString()}`);
+  line(`**Exportado em:** ${new Date().toLocaleDateString("pt-BR")}`);
+  br();
+  line(`---`);
+  br();
+
+  prompts.forEach((p, idx) => {
+    line(`## ${idx + 1}. ${p.title}`);
+    br();
+    line(`**Tipo:** \`${p.type}\``);
+    if (p.platform) line(`**Plataforma:** ${p.platform}`);
+    line(`**Versão:** v${p.version}`);
+    if (p.tokens_estimate) line(`**Tokens estimados:** ${p.tokens_estimate.toLocaleString()}`);
+    line(`**Gerado em:** ${new Date(p.created_at).toLocaleDateString("pt-BR")}`);
+    br();
+    if (p.content) {
+      line("```");
+      line(p.content);
+      line("```");
+    } else {
+      line("*Sem conteúdo*");
+    }
+    br();
+    if (idx < prompts.length - 1) { line(`---`); br(); }
+  });
+
+  line(`*Arquiteto IA · ${new Date().toLocaleDateString("pt-BR")}*`);
+  return lines.join("\n");
+};
+
+type ExportFormat = "markdown" | "json" | "prompts";
+
+// ── Prompts fetch wrapper ──────────────────────────────────────────────────
+const ExportPreview = ({
+  project,
+  format,
+}: {
+  project: Project;
+  format: ExportFormat;
+}) => {
+  const { data: prompts, isLoading } = useProjectPrompts(project.id);
+
+  if (format === "prompts" && isLoading) {
+    return (
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="px-5 py-3 border-b border-border bg-muted/30">
+          <Skeleton className="h-4 w-40" />
+        </div>
+        <div className="p-5 space-y-3">
+          {[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
+        </div>
+      </div>
+    );
+  }
+
+  const content =
+    format === "markdown"
+      ? generateMarkdown(project)
+      : format === "json"
+        ? generateJSON(project)
+        : generatePromptsMarkdown(project, (prompts ?? []) as Prompt[]);
+
+  const ext = format === "markdown" ? "md" : format === "json" ? "json" : "md";
+  const fileName = `${project.slug ?? project.title.toLowerCase().replace(/\s+/g, "-")}-${format === "prompts" ? "prompts" : "export"}.${ext}`;
+
+  return (
+    <motion.div
+      key={`${project.id}-${format}`}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      className="rounded-xl border border-border bg-card overflow-hidden"
+    >
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
+        <div className="flex items-center gap-2">
+          {format === "markdown" || format === "prompts"
+            ? <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+            : <Code className="w-3.5 h-3.5 text-muted-foreground" />}
+          <span className="text-2xs font-medium text-muted-foreground">{fileName}</span>
+        </div>
+        <span className="text-2xs text-muted-foreground">{content.length.toLocaleString()} chars</span>
+      </div>
+      <pre className="p-5 text-2xs text-foreground leading-relaxed whitespace-pre-wrap font-mono overflow-auto max-h-[520px]">
+        {content}
+      </pre>
+    </motion.div>
+  );
+};
+
+// ── Main ────────────────────────────────────────────────────────────────────
 const ExportsPage = () => {
   const { data: projects, isLoading, error } = useProjects();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [format, setFormat] = useState<ExportFormat>("markdown");
   const [copied, setCopied] = useState(false);
 
+  const { data: prompts } = useProjectPrompts(selectedId ?? undefined);
   const selectedProject = projects?.find(p => p.id === selectedId) ?? null;
-  const content = selectedProject
-    ? format === "markdown" ? generateMarkdown(selectedProject) : generateJSON(selectedProject)
-    : "";
+
+  const getContent = (): string => {
+    if (!selectedProject) return "";
+    if (format === "markdown") return generateMarkdown(selectedProject);
+    if (format === "json") return generateJSON(selectedProject);
+    return generatePromptsMarkdown(selectedProject, (prompts ?? []) as Prompt[]);
+  };
 
   const handleCopy = async () => {
+    const content = getContent();
     await navigator.clipboard.writeText(content);
     setCopied(true);
     toast.success("Conteúdo copiado!");
@@ -90,13 +206,15 @@ const ExportsPage = () => {
 
   const handleDownload = () => {
     if (!selectedProject) return;
-    const ext = format === "markdown" ? "md" : "json";
-    const mime = format === "markdown" ? "text/plain;charset=utf-8" : "application/json;charset=utf-8";
+    const content = getContent();
+    const ext = format === "json" ? "json" : "md";
+    const mime = format === "json" ? "application/json;charset=utf-8" : "text/plain;charset=utf-8";
+    const suffix = format === "prompts" ? "-prompts" : "";
     const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${selectedProject.slug ?? selectedProject.title.toLowerCase().replace(/\s+/g, "-")}.${ext}`;
+    a.download = `${selectedProject.slug ?? selectedProject.title.toLowerCase().replace(/\s+/g, "-")}${suffix}.${ext}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -108,7 +226,7 @@ const ExportsPage = () => {
     <div className="space-y-6 max-w-4xl">
       <PageHeader
         title="Exportações"
-        subtitle="Exporte a documentação técnica dos seus projetos em Markdown ou JSON"
+        subtitle="Exporte a documentação técnica dos seus projetos em Markdown, JSON ou Prompts gerados"
       />
 
       {isLoading && (
@@ -158,6 +276,7 @@ const ExportsPage = () => {
               {([
                 { value: "markdown", label: "Markdown", icon: FileText },
                 { value: "json",     label: "JSON",     icon: FileJson },
+                { value: "prompts",  label: "Prompts",  icon: Zap      },
               ] as { value: ExportFormat; label: string; icon: React.ElementType }[]).map(({ value, label, icon: Icon }) => (
                 <button
                   key={value}
@@ -190,7 +309,7 @@ const ExportsPage = () => {
                   className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  Baixar .{format === "markdown" ? "md" : "json"}
+                  Baixar .{format === "json" ? "json" : "md"}
                 </button>
               </div>
             )}
@@ -210,26 +329,7 @@ const ExportsPage = () => {
                 <p className="text-xs text-muted-foreground">Selecione um projeto para pré-visualizar</p>
               </motion.div>
             ) : (
-              <motion.div
-                key={`${selectedId}-${format}`}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="rounded-xl border border-border bg-card overflow-hidden"
-              >
-                <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
-                  <div className="flex items-center gap-2">
-                    {format === "markdown" ? <FileText className="w-3.5 h-3.5 text-muted-foreground" /> : <Code className="w-3.5 h-3.5 text-muted-foreground" />}
-                    <span className="text-2xs font-medium text-muted-foreground">
-                      {selectedProject.slug ?? selectedProject.title.toLowerCase().replace(/\s+/g, "-")}.{format === "markdown" ? "md" : "json"}
-                    </span>
-                  </div>
-                  <span className="text-2xs text-muted-foreground">{content.length.toLocaleString()} chars</span>
-                </div>
-                <pre className="p-5 text-2xs text-foreground leading-relaxed whitespace-pre-wrap font-mono overflow-auto max-h-[520px]">
-                  {content}
-                </pre>
-              </motion.div>
+              <ExportPreview project={selectedProject} format={format} />
             )}
           </AnimatePresence>
         </motion.div>

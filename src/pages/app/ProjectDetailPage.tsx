@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -55,9 +55,7 @@ const statusConfig = {
 };
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
-const Skeleton = ({ className }: { className?: string }) => (
-  <div className={cn("rounded-md bg-muted/60 animate-pulse", className)} />
-);
+import { Skeleton } from "@/components/ui/skeleton";
 
 // ── Empty tab content ─────────────────────────────────────────────────────────
 const EmptyTab = ({ icon: Icon, title, sub }: { icon: React.ElementType; title: string; sub: string }) => (
@@ -1256,20 +1254,28 @@ const ProjectDetailPage = () => {
           ))}
         </div>
 
-        {/* ── Tab Content ── */}
-        <div>
-          {activeTab === "overview"  && <OverviewTab project={project} />}
-          {activeTab === "idea"      && <IdeaTab idea={project.original_idea} />}
-          {activeTab === "prompts"   && <PromptsTab projectId={project.id} />}
-          {activeTab === "versions"  && <VersionsTab projectId={project.id} />}
-          {activeTab === "modules"   && <AIContentTabWrapper projectId={project.id} contentType="modules" icon={Puzzle} title="Módulos do Sistema" description="A IA decomporá o projeto em módulos bem definidos, com funcionalidades, dependências e complexidade de cada um." persistedContent={aiContentCache["modules"] ?? null} onContentGenerated={handleContentGenerated} />}
-          {activeTab === "screens"   && <ScreensTabWrapper projectId={project.id} persistedContent={aiContentCache["screens"] ?? null} onContentGenerated={handleContentGenerated} projectMetadata={(project.metadata as Record<string, unknown>) ?? {}} onUpdateMetadata={(patch) => updateProject.mutate({ metadata: patch as never })} projectPlatform={project.platform ?? undefined} />}
-          {activeTab === "database"  && <AIContentTabWrapper projectId={project.id} contentType="database" icon={Database} title="Esquema do Banco de Dados" description="A IA gerará o schema SQL completo com tabelas, relacionamentos, índices e RLS policies." persistedContent={aiContentCache["database"] ?? null} onContentGenerated={handleContentGenerated} />}
-          {activeTab === "rules"     && <AIContentTabWrapper projectId={project.id} contentType="rules" icon={ScrollText} title="Regras de Negócio" description="A IA documentará todas as regras de negócio, validações e fluxos condicionais do sistema." persistedContent={aiContentCache["rules"] ?? null} onContentGenerated={handleContentGenerated} />}
-          {activeTab === "exports"   && <InlineExportTab project={project} />}
-          {activeTab === "eval"      && <EvalTab projectId={project.id} currentScore={project.quality_score} />}
-          {activeTab === "ai"        && <AIReviewTab projectId={project.id} />}
-        </div>
+        {/* ── Tab Content with AnimatePresence ── */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2 }}
+          >
+            {activeTab === "overview"  && <OverviewTab project={project} />}
+            {activeTab === "idea"      && <IdeaTab idea={project.original_idea} />}
+            {activeTab === "prompts"   && <PromptsTab projectId={project.id} />}
+            {activeTab === "versions"  && <VersionsTab projectId={project.id} />}
+            {activeTab === "modules"   && <AIContentTabWrapper projectId={project.id} contentType="modules" icon={Puzzle} title="Módulos do Sistema" description="A IA decomporá o projeto em módulos bem definidos, com funcionalidades, dependências e complexidade de cada um." persistedContent={aiContentCache["modules"] ?? null} onContentGenerated={handleContentGenerated} />}
+            {activeTab === "screens"   && <ScreensTabWrapper projectId={project.id} persistedContent={aiContentCache["screens"] ?? null} onContentGenerated={handleContentGenerated} projectMetadata={(project.metadata as Record<string, unknown>) ?? {}} onUpdateMetadata={(patch) => updateProject.mutate({ metadata: patch as never })} projectPlatform={project.platform ?? undefined} />}
+            {activeTab === "database"  && <AIContentTabWrapper projectId={project.id} contentType="database" icon={Database} title="Esquema do Banco de Dados" description="A IA gerará o schema SQL completo com tabelas, relacionamentos, índices e RLS policies." persistedContent={aiContentCache["database"] ?? null} onContentGenerated={handleContentGenerated} />}
+            {activeTab === "rules"     && <AIContentTabWrapper projectId={project.id} contentType="rules" icon={ScrollText} title="Regras de Negócio" description="A IA documentará todas as regras de negócio, validações e fluxos condicionais do sistema." persistedContent={aiContentCache["rules"] ?? null} onContentGenerated={handleContentGenerated} />}
+            {activeTab === "exports"   && <InlineExportTab project={project} />}
+            {activeTab === "eval"      && <EvalTab projectId={project.id} currentScore={project.quality_score} />}
+            {activeTab === "ai"        && <AIReviewTab projectId={project.id} />}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* ── Delete dialog ── */}

@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": allowedOrigin,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
@@ -81,7 +82,6 @@ Categorias obrigatórias:
 Seja extremamente específico e acionável — estas regras serão implementadas diretamente por desenvolvedores.`,
 };
 
-// Model selection: use gemini-2.5-flash for screens (richest output needed for mockup generation)
 const modelForContentType: Record<ContentType, string> = {
   modules:  "google/gemini-2.5-flash",
   screens:  "google/gemini-2.5-flash",
