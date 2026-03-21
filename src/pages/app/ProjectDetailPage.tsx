@@ -901,18 +901,32 @@ const AIContentTabWrapper = ({
   );
 };
 
-// ── ScreensTabWrapper — aba de Telas com geração de mockups ───────────────────
+// ── ScreensTabWrapper — aba de Telas com geração de mockups e persistência ────
 const ScreensTabWrapper = ({
   projectId,
   persistedContent,
   onContentGenerated,
+  projectMetadata,
+  onUpdateMetadata,
 }: {
   projectId: string;
   persistedContent: string | null;
   onContentGenerated: (contentType: string, content: string) => void;
+  projectMetadata: Record<string, unknown> | null;
+  onUpdateMetadata: (patch: Record<string, unknown>) => void;
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Load persisted mockup URLs from project.metadata.mockups
+  const initialMockups = (projectMetadata?.mockups ?? {}) as Record<string, string>;
+
+  const handleMockupSaved = (screenName: string, url: string) => {
+    // Only persist storage URLs, not base64 (base64 = temp fallback)
+    if (url.startsWith("data:")) return;
+    const existingMockups = (projectMetadata?.mockups ?? {}) as Record<string, string>;
+    onUpdateMetadata({ ...projectMetadata, mockups: { ...existingMockups, [screenName]: url } });
+  };
 
   const handleGenerate = async () => {
     setIsLoading(true);
@@ -954,6 +968,8 @@ const ScreensTabWrapper = ({
       isLoading={isLoading}
       error={error}
       onGenerate={handleGenerate}
+      initialMockups={initialMockups}
+      onMockupSaved={handleMockupSaved}
     />
   );
 };
