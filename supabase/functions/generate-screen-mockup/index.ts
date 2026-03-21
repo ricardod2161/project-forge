@@ -154,13 +154,7 @@ serve(async (req) => {
     // Determine platform
     const effectivePlatform = platform_type ?? project.platform ?? "Web";
     const isMobile = ["mobile", "ios", "android", "react native", "flutter"].some(k => effectivePlatform.toLowerCase().includes(k));
-    const resolution = isMobile ? "390×844px portrait (iPhone 15 Pro)" : "1440×900px widescreen (MacBook Pro)";
-    const canvasSize = isMobile ? "390×844" : "1440×900";
-    const aspectNote = isMobile ? "PORTRAIT orientation, tall mobile screen" : "LANDSCAPE widescreen desktop, 16:9 ratio";
-
     // Context enrichment
-    const features = (project.features ?? []).slice(0, 8).join(", ") || "core application features";
-    const integrations = (project.integrations ?? []).slice(0, 5).join(", ") || "none";
     const nicheContext = getNicheContext(project.niche ?? "");
     const styleAnchors = getStyleAnchors(`${project.type ?? ""} ${project.niche ?? ""}`, project.niche ?? "");
     const componentHints = getComponentHints(screen_name, isMobile);
