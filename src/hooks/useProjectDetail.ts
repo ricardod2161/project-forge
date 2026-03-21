@@ -226,9 +226,21 @@ export function useProjectEvaluation(projectId: string | undefined) {
   return useQuery<Evaluation | null>({
     queryKey: ["evaluation", projectId],
     enabled: !!projectId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("evaluations")
+    queryFn: async (): Promise<Evaluation | null> => {
+      // Cast necessário pois a tabela evaluations não está no types.ts gerado ainda
+      const { data, error } = await (supabase as unknown as {
+        from: (table: string) => {
+          select: (cols: string) => {
+            eq: (col: string, val: string) => {
+              order: (col: string, opts: { ascending: boolean }) => {
+                limit: (n: number) => {
+                  maybeSingle: () => Promise<{ data: Record<string, unknown> | null; error: unknown }>;
+                };
+              };
+            };
+          };
+        };
+      }).from("evaluations")
         .select("*")
         .eq("project_id", projectId!)
         .order("created_at", { ascending: false })
@@ -237,10 +249,15 @@ export function useProjectEvaluation(projectId: string | undefined) {
       if (error) throw error;
       if (!data) return null;
       return {
-        ...data,
+        id: data.id as string,
+        project_id: data.project_id as string,
+        user_id: data.user_id as string,
+        overall_score: data.overall_score as number,
         dimensions: (data.dimensions as unknown as EvalDimension[]) ?? [],
+        summary: data.summary as string | null,
         top_priorities: (data.top_priorities as unknown as string[]) ?? [],
-      } as Evaluation;
+        created_at: data.created_at as string,
+      };
     },
   });
 }
