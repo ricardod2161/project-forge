@@ -21,7 +21,7 @@ const AppHeader = () => {
   const [cmdOpen, setCmdOpen] = useState(false);
   const { isDark, toggleTheme } = useAppTheme();
 
-  // Atalho de teclado Cmd+K / Ctrl+K para abrir Command Palette
+  // Atalho Cmd+K / Ctrl+K
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -52,25 +52,28 @@ const AppHeader = () => {
 
   return (
     <>
-      <header className="h-14 flex items-center gap-3 px-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-30">
-        <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors" />
+      <header className="h-14 flex items-center gap-3 px-4 border-b border-border bg-background/90 backdrop-blur-sm sticky top-0 z-30">
+        <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors -ml-1" />
 
+        {/* Global search trigger */}
         <button
           onClick={() => setCmdOpen(true)}
           className={cn(
-            "flex-1 max-w-sm flex items-center gap-2 px-3 py-1.5 rounded-lg",
+            "flex-1 max-w-xs sm:max-w-sm flex items-center gap-2 px-3 py-1.5 rounded-lg",
             "bg-surface border border-border text-muted-foreground text-xs",
             "hover:border-primary/40 hover:text-foreground transition-all duration-200",
-            "cursor-pointer"
+            "cursor-pointer group"
           )}
           aria-label="Busca global (Ctrl+K)"
         >
-          <Search className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>Buscar projetos, templates...</span>
-          <kbd className="ml-auto text-2xs bg-muted px-1.5 py-0.5 rounded font-mono">⌘K</kbd>
+          <Search className="w-3.5 h-3.5 flex-shrink-0 group-hover:text-primary transition-colors" />
+          <span className="hidden sm:block truncate">Buscar projetos, templates...</span>
+          <span className="sm:hidden">Buscar...</span>
+          <kbd className="ml-auto text-2xs bg-muted px-1.5 py-0.5 rounded font-mono hidden sm:block">⌘K</kbd>
         </button>
 
         <div className="flex items-center gap-1 ml-auto">
+          {/* Theme toggle */}
           <Button
             variant="ghost"
             size="icon"
@@ -81,34 +84,25 @@ const AppHeader = () => {
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </Button>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground relative"
-            aria-label="Notificações"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
-          </Button>
-
+          {/* User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 className={cn(
-                  "flex items-center gap-2 px-2 py-1.5 rounded-lg",
+                  "flex items-center gap-2 pl-1 pr-2 py-1.5 rounded-lg",
                   "hover:bg-surface transition-colors duration-150",
                   "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 )}
                 aria-label="Menu do usuário"
               >
-                <div className="w-7 h-7 rounded-full bg-gradient-primary flex items-center justify-center flex-shrink-0">
+                <div className="w-7 h-7 rounded-full bg-gradient-primary flex items-center justify-center flex-shrink-0 shadow-sm">
                   {initials ? (
                     <span className="text-2xs font-bold text-primary-foreground">{initials}</span>
                   ) : (
                     <User className="w-3.5 h-3.5 text-primary-foreground" />
                   )}
                 </div>
-                <span className="text-xs font-medium text-foreground hidden sm:block max-w-[120px] truncate">
+                <span className="text-xs font-medium text-foreground hidden sm:block max-w-[100px] truncate">
                   {displayName}
                 </span>
                 <ChevronDown className="w-3 h-3 text-muted-foreground hidden sm:block" />
