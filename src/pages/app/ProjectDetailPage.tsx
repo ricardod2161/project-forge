@@ -901,18 +901,32 @@ const AIContentTabWrapper = ({
   );
 };
 
-// ── ScreensTabWrapper — aba de Telas com geração de mockups ───────────────────
+// ── ScreensTabWrapper — aba de Telas com geração de mockups e persistência ────
 const ScreensTabWrapper = ({
   projectId,
   persistedContent,
   onContentGenerated,
+  projectMetadata,
+  onUpdateMetadata,
 }: {
   projectId: string;
   persistedContent: string | null;
   onContentGenerated: (contentType: string, content: string) => void;
+  projectMetadata: Record<string, unknown> | null;
+  onUpdateMetadata: (patch: Record<string, unknown>) => void;
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Load persisted mockup URLs from project.metadata.mockups
+  const initialMockups = (projectMetadata?.mockups ?? {}) as Record<string, string>;
+
+  const handleMockupSaved = (screenName: string, url: string) => {
+    // Only persist storage URLs, not base64 (base64 = temp fallback)
+    if (url.startsWith("data:")) return;
+    const existingMockups = (projectMetadata?.mockups ?? {}) as Record<string, string>;
+    onUpdateMetadata({ ...projectMetadata, mockups: { ...existingMockups, [screenName]: url } });
+  };
 
   const handleGenerate = async () => {
     setIsLoading(true);
@@ -954,6 +968,8 @@ const ScreensTabWrapper = ({
       isLoading={isLoading}
       error={error}
       onGenerate={handleGenerate}
+      initialMockups={initialMockups}
+      onMockupSaved={handleMockupSaved}
     />
   );
 };
@@ -1244,7 +1260,7 @@ const ProjectDetailPage = () => {
           {activeTab === "prompts"   && <PromptsTab projectId={project.id} />}
           {activeTab === "versions"  && <VersionsTab projectId={project.id} />}
           {activeTab === "modules"   && <AIContentTabWrapper projectId={project.id} contentType="modules" icon={Puzzle} title="Módulos do Sistema" description="A IA decomporá o projeto em módulos bem definidos, com funcionalidades, dependências e complexidade de cada um." persistedContent={aiContentCache["modules"] ?? null} onContentGenerated={handleContentGenerated} />}
-          {activeTab === "screens"   && <ScreensTabWrapper projectId={project.id} persistedContent={aiContentCache["screens"] ?? null} onContentGenerated={handleContentGenerated} />}
+          {activeTab === "screens"   && <ScreensTabWrapper projectId={project.id} persistedContent={aiContentCache["screens"] ?? null} onContentGenerated={handleContentGenerated} projectMetadata={(project.metadata as Record<string, unknown>) ?? {}} onUpdateMetadata={(patch) => updateProject.mutate({ metadata: patch as never })} />}
           {activeTab === "database"  && <AIContentTabWrapper projectId={project.id} contentType="database" icon={Database} title="Esquema do Banco de Dados" description="A IA gerará o schema SQL completo com tabelas, relacionamentos, índices e RLS policies." persistedContent={aiContentCache["database"] ?? null} onContentGenerated={handleContentGenerated} />}
           {activeTab === "rules"     && <AIContentTabWrapper projectId={project.id} contentType="rules" icon={ScrollText} title="Regras de Negócio" description="A IA documentará todas as regras de negócio, validações e fluxos condicionais do sistema." persistedContent={aiContentCache["rules"] ?? null} onContentGenerated={handleContentGenerated} />}
           {activeTab === "exports"   && <InlineExportTab project={project} />}

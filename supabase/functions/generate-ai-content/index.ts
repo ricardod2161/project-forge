@@ -13,44 +13,80 @@ const contentInstructions: Record<ContentType, string> = {
 Para cada módulo inclua:
 - Nome do módulo (## Módulo: Nome)
 - Descrição em 1-2 frases
-- Funcionalidades principais (lista com bullets)
-- Dependências de outros módulos
-- Nível de complexidade (Básico / Intermediário / Avançado)
+- Funcionalidades principais (lista com bullets detalhados)
+- Dependências de outros módulos (especifique quais e por quê)
+- Nível de complexidade (Básico / Intermediário / Avançado) com justificativa
+- Tecnologias ou padrões recomendados para implementação
 
-Organize por ordem lógica de implementação. Seja específico para este nicho e tipo de projeto.`,
+Organize por ordem lógica de implementação (base → features → integrações).
+Seja muito específico para este nicho e tipo de projeto. Nunca use exemplos genéricos.
+Mínimo 8 módulos, máximo 15.`,
 
-  screens: `Liste e descreva todas as telas/páginas do sistema em formato Markdown.
+  screens: `Liste e descreva TODAS as telas/páginas do sistema com máximo de detalhes visuais e de UX em formato Markdown.
 Para cada tela inclua:
-- Nome da tela (## Tela: Nome)
-- Rota sugerida (/caminho)
-- Tipo (Pública / Privada / Admin)
-- Elementos principais da UI (formulários, tabelas, cards, etc.)
-- Ações disponíveis nessa tela
-- Estados possíveis (loading, empty, error, success)
+- Nome da tela exato (## Tela: NomeDaTela) — use este formato exato
+- Rota sugerida (/caminho/sugerido)
+- Tipo de acesso (Pública / Privada / Admin)
+- Componentes de UI presentes: liste cada componente visual específico (ex: tabela com 6 colunas, filtros laterais, cards de KPI, formulário com validação inline, barra de progresso, etc.)
+- Hierarquia de informação: o que é mais importante visualmente nessa tela?
+- Ações do usuário: botões, formulários, drag-and-drop, etc.
+- Estados da tela: loading skeleton, estado vazio com CTA, estado de erro, estado preenchido com dados
+- Dados exibidos: que tipo de informação aparece? (métricas, listas, gráficos, texto)
+- Navegação: de onde o usuário vem e para onde pode ir
 
-Organize por fluxo de usuário (onboarding → dashboard → features → configurações).`,
+Organize pelo fluxo completo do usuário:
+1. Autenticação (login, cadastro, recuperação)
+2. Onboarding inicial
+3. Dashboard/Home
+4. Funcionalidades principais
+5. Configurações e perfil
+6. Admin (se aplicável)
 
-  database: `Crie o esquema completo do banco de dados em formato Markdown com SQL.
+Mínimo 10 telas, máximo 16. Seja extremamente específico para o nicho descrito.`,
+
+  database: `Crie o esquema completo do banco de dados em formato Markdown com SQL detalhado.
 Para cada tabela inclua:
-- Nome e propósito (## Tabela: nome)
-- Definição SQL com tipos corretos
-- Índices recomendados
-- RLS policies essenciais
-- Relacionamentos com outras tabelas
+- Nome e propósito preciso (## Tabela: nome)
+- Definição SQL completa com tipos corretos, constraints e defaults
+- Índices recomendados com justificativa de performance
+- RLS policies essenciais (SELECT, INSERT, UPDATE, DELETE)
+- Relacionamentos com outras tabelas (FK com ON DELETE behavior)
+- Exemplos de dados realistas para a tabela
 
-Use PostgreSQL. Inclua campos padrão (id UUID, created_at, updated_at, user_id onde aplicável).
-Finalize com um diagrama de relacionamentos em texto (ERD simplificado).`,
+Use PostgreSQL com Supabase. Inclua campos padrão (id UUID primary key, created_at timestamptz, updated_at timestamptz, user_id UUID).
+Inclua também:
+- Funções e triggers necessários
+- Views úteis para queries complexas
+- Finalize com diagrama ERD simplificado em texto mostrando todos os relacionamentos`,
 
-  rules: `Documente todas as regras de negócio do sistema em formato Markdown.
-Para cada área inclua:
+  rules: `Documente todas as regras de negócio do sistema em formato Markdown detalhado e técnico.
+Para cada categoria inclua:
 - Categoria (## Categoria: Nome)
-- Regras numeradas e específicas
-- Casos de borda e exceções
-- Validações necessárias
-- Fluxos condicionais
+- Regras numeradas, específicas e não ambíguas
+- Casos de borda e exceções documentados
+- Validações necessárias (frontend e backend)
+- Fluxos condicionais com pseudocódigo quando necessário
+- Impacto em outras partes do sistema
 
-Categorias sugeridas: Autenticação e Acesso, Fluxos de Dados, Validações, Notificações, Monetização/Planos, Integrações.
-Seja específico e detalhado — estas regras serão usadas por desenvolvedores.`,
+Categorias obrigatórias:
+1. Autenticação, Autorização e Permissões
+2. Fluxos de Dados e Processamento
+3. Validações e Regras de Integridade
+4. Notificações e Comunicação
+5. Monetização, Planos e Limites
+6. Integrações e APIs externas
+7. Auditoria, Logs e Segurança
+8. Performance e Escalabilidade
+
+Seja extremamente específico e acionável — estas regras serão implementadas diretamente por desenvolvedores.`,
+};
+
+// Model selection: use gemini-2.5-flash for screens (richest output needed for mockup generation)
+const modelForContentType: Record<ContentType, string> = {
+  modules:  "google/gemini-2.5-flash",
+  screens:  "google/gemini-2.5-flash",
+  database: "google/gemini-2.5-flash",
+  rules:    "google/gemini-2.5-flash",
 };
 
 serve(async (req) => {
@@ -107,24 +143,30 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurado");
 
-    const systemPrompt = `Você é um arquiteto de software sênior com 20 anos de experiência construindo sistemas complexos.
-Você documenta sistemas de software de forma clara, técnica e acionável.
-Responda sempre em Markdown bem estruturado com hierarquia clara de headings.
-Seja específico para o nicho e tipo de sistema descrito. Nunca use exemplos genéricos.
+    const systemPrompt = `Você é um arquiteto de software sênior com 20 anos de experiência construindo sistemas SaaS complexos.
+Você documenta sistemas com precisão técnica, especificidade de domínio e clareza acionável.
+Responda sempre em Markdown bem estruturado com hierarquia clara de headings (##, ###).
+Seja profundamente específico para o nicho, tipo e público-alvo do projeto descrito.
+NUNCA use exemplos genéricos. NUNCA escreva "Lorem ipsum".
+Use terminologia técnica correta do domínio. Seja detalhista e completo.
 Linguagem: português brasileiro técnico-profissional.`;
 
     const userPrompt = `Para o seguinte projeto, ${contentInstructions[content_type]}
 
 **Projeto:** ${project.title}
 **Tipo:** ${project.type ?? "Não definido"}
-**Nicho:** ${project.niche ?? "Não definido"}  
+**Nicho:** ${project.niche ?? "Não definido"}
 **Plataforma:** ${project.platform ?? "Web"}
 **Complexidade:** ${project.complexity ?? 3}/5
 **Público-alvo:** ${project.audience ?? "Não especificado"}
 **Ideia original:** ${project.original_idea ?? "Não fornecida"}
 **Funcionalidades listadas:** ${(project.features ?? []).join(", ") || "Nenhuma"}
 **Integrações:** ${(project.integrations ?? []).join(", ") || "Nenhuma"}
-**Monetização:** ${project.monetization ?? "Não definida"}`;
+**Monetização:** ${project.monetization ?? "Não definida"}
+
+Gere documentação profissional, completa e altamente específica para este projeto.`;
+
+    const selectedModel = modelForContentType[content_type];
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -133,7 +175,7 @@ Linguagem: português brasileiro técnico-profissional.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: selectedModel,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
