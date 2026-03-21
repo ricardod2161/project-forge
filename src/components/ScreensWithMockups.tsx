@@ -194,18 +194,24 @@ const MockupCard = ({
   projectId,
   mockup,
   onMockupGenerated,
+  platformType,
+  isMobile,
 }: {
   screenName: string;
   screenDescription: string;
   projectId: string;
   mockup: MockupState;
   onMockupGenerated: (name: string, url: string, persisted: boolean) => void;
+  platformType?: string;
+  isMobile?: boolean;
 }) => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [confirmRegen, setConfirmRegen] = useState(false);
   const [showPrev, setShowPrev] = useState(false);
 
   const isGenerating = mockup.isLoading;
+  // Aspect ratio: portrait for mobile, widescreen for web/desktop
+  const aspectClass = isMobile ? "aspect-[9/16]" : "aspect-[16/10]";
 
   const doGenerate = async () => {
     setConfirmRegen(false);
@@ -215,6 +221,7 @@ const MockupCard = ({
           project_id: projectId,
           screen_name: screenName,
           screen_description: screenDescription,
+          platform_type: platformType,
         },
       });
       if (error) throw error;
@@ -270,10 +277,10 @@ const MockupCard = ({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="rounded-xl border border-border bg-card overflow-hidden flex flex-col group"
+        className="rounded-xl border border-border bg-card overflow-hidden flex flex-col group hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200"
       >
-        {/* Image area */}
-        <div className="relative aspect-[9/16] bg-muted/20 overflow-hidden">
+        {/* Image area — aspect ratio adapts to platform */}
+        <div className={cn("relative bg-muted/20 overflow-hidden", aspectClass)}>
           {isGenerating ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-muted/20">
               <div className="relative">
