@@ -32,6 +32,12 @@ export interface ScreensWithMockupsProps {
   onMockupSaved?: (screenName: string, url: string) => void;
   /** project platform for aspect ratio detection */
   projectPlatform?: string;
+  /** label override — "tela" (default) or "página" for website mode */
+  sectionLabel?: string;
+  /** empty state title override */
+  emptyTitle?: string;
+  /** empty state description override */
+  emptyDescription?: string;
 }
 
 // ── Robust screen parser — collects up to 800 chars of full description ────────
