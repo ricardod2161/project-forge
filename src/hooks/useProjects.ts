@@ -78,7 +78,7 @@ export function useProjectMetrics() {
       const [projectsRes, promptsRes] = await Promise.all([
         supabase
           .from("projects")
-          .select("status, quality_score")
+          .select("status, quality_score, is_favorite")
           .eq("user_id", userId),
         supabase
           .from("prompts")
@@ -89,7 +89,7 @@ export function useProjectMetrics() {
       const projects = projectsRes.data ?? [];
       const totalProjects = projects.length;
       const activeProjects = projects.filter((p) => p.status === "active").length;
-      const favoriteProjects = projects.filter((p) => (p as { is_favorite: boolean }).is_favorite).length;
+      const favoriteProjects = projects.filter((p) => p.is_favorite).length;
       const totalPrompts = promptsRes.count ?? 0;
 
       const scored = projects.filter((p) => p.quality_score !== null);
