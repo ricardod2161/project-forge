@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callGemini } from "../_shared/ai-providers.ts";
 
 const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
 const corsHeaders = {
@@ -167,17 +168,6 @@ Estático vs dinâmico, integração CMS, cache e revalidação.
 Configuração vite.config.ts, variáveis de ambiente, domínio e DNS, headers de segurança, preview URLs.`,
 };
 
-const modelForContentType: Record<ContentType, string> = {
-  modules:        "google/gemini-2.5-flash",
-  screens:        "google/gemini-2.5-flash",
-  database:       "google/gemini-2.5-flash",
-  rules:          "google/gemini-2.5-flash",
-  site_pages:     "google/gemini-2.5-flash",
-  site_copy:      "google/gemini-2.5-flash",
-  site_seo:       "google/gemini-2.5-flash",
-  site_structure: "google/gemini-2.5-flash",
-};
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -229,9 +219,6 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurado");
-
     // Detect website and build context
     const isWebsite = (project.metadata as Record<string, unknown>)?.mode === "website";
     const websiteMeta = (project.metadata as Record<string, unknown>) ?? {};
@@ -278,46 +265,29 @@ Linguagem: português brasileiro técnico-profissional.`;
 ${websiteContext}
 Gere documentação profissional, completa e altamente específica para este projeto.`;
 
-    const selectedModel = modelForContentType[content_type];
-
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: selectedModel,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
+    // Gemini 2.0 Flash: contexto 1M tokens, ideal para geração de conteúdo longo
+    const content = await callGemini(`${systemPrompt}\n\n${userPrompt}`, {
+      maxTokens: 8192,
+      temperature: 0.7,
     });
-
-    if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "Limite de requisições atingido. Aguarde alguns minutos." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error(`AI Gateway error: ${aiResponse.status}`);
-    }
-
-    const aiData = await aiResponse.json();
-    const content = aiData.choices?.[0]?.message?.content ?? "";
 
     return new Response(JSON.stringify({ content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("generate-ai-content error:", err);
+    const status = (err as { status?: number }).status;
+    if (status === 429) {
+      return new Response(JSON.stringify({ error: "Limite de requisições Google AI atingido. Aguarde alguns minutos e tente novamente." }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (status === 403) {
+      return new Response(JSON.stringify({ error: "GOOGLE_AI_KEY inválida ou sem permissão. Verifique em aistudio.google.com." }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Erro interno" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

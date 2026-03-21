@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { User, Palette, Bell, CreditCard, Shield, Sun, Moon, Save, Check, Lock, Bot, Trash2, AlertTriangle } from "lucide-react";
+import { User, Palette, Bell, CreditCard, Shield, Sun, Moon, Save, Check, Lock, Bot, Trash2, AlertTriangle, Zap } from "lucide-react";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -440,6 +440,86 @@ const SecuritySection = () => {
   );
 };
 
+// ── AI Providers section ───────────────────────────────────────────────────────
+const AIProvidersSection = () => {
+  const providers = [
+    {
+      icon: "⚡",
+      name: "Groq",
+      models: "llama-3.1-8b · llama-3.3-70b",
+      usage: "Refinar ideias, gerar prompts, revisão de projetos",
+      badge: "Gratuito",
+      badgeClass: "bg-success/10 text-success border-success/20",
+    },
+    {
+      icon: "✦",
+      name: "Google AI (Gemini 2.0 Flash)",
+      models: "gemini-2.0-flash",
+      usage: "Geração de módulos, telas, banco de dados e regras",
+      badge: "Gratuito",
+      badgeClass: "bg-success/10 text-success border-success/20",
+    },
+    {
+      icon: "◎",
+      name: "OpenAI",
+      models: "gpt-4o-mini",
+      usage: "Avaliação de qualidade (score estruturado)",
+      badge: "Pago",
+      badgeClass: "bg-warning/10 text-warning border-warning/20",
+    },
+    {
+      icon: "🖼",
+      name: "Lovable Gateway",
+      models: "gemini-3.1-flash-image",
+      usage: "Geração de mockups visuais de telas e páginas",
+      badge: "Lovable",
+      badgeClass: "bg-accent/10 text-accent border-accent/20",
+    },
+  ];
+
+  return (
+    <div className="p-6 rounded-xl border border-border bg-card space-y-5">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+          <Zap className="w-4 h-4 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-xs font-semibold text-foreground">Provedores de IA</h2>
+          <p className="text-2xs text-muted-foreground">Modelos ativos por funcionalidade</p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {providers.map((p) => (
+          <div
+            key={p.name}
+            className="flex items-start gap-3 p-3 rounded-lg border border-border bg-surface/30"
+          >
+            <span className="text-base flex-shrink-0 mt-0.5">{p.icon}</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-2xs font-semibold text-foreground">{p.name}</span>
+                <span className={cn(
+                  "px-2 py-0.5 rounded-full text-[10px] font-medium border",
+                  p.badgeClass
+                )}>
+                  {p.badge}
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{p.models}</p>
+              <p className="text-[10px] text-muted-foreground/70">{p.usage}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-[10px] text-muted-foreground pt-2 border-t border-border">
+        💡 Configure as chaves de API no painel do Lovable Cloud → Secrets
+      </p>
+    </div>
+  );
+};
+
 // ── Danger zone section ────────────────────────────────────────────────────────
 const DangerZoneSection = () => {
   const { user, signOut } = useAuth();
@@ -547,6 +627,7 @@ const SettingsPage = () => (
         <div className="space-y-5">
           <AppearanceSection />
           <AIPreferencesSection />
+          <AIProvidersSection />
           <NotificationsSection />
           <PlanSection />
         </div>
