@@ -478,7 +478,7 @@ PERFORMANCE (identificar e corrigir):
 - Code splitting: React.lazy para páginas e modais pesados
 
 TYPESCRIPT STRICTNESS:
-- Eliminar todos os `any` — substituir por tipos específicos ou unknown
+- Eliminar todos os 'any' — substituir por tipos específicos ou unknown
 - Tipar respostas do Supabase com Database['public']['Tables']['tabela']['Row']
 - Interfaces vs Types: preferir interface para objetos, type para unions
 - Zod schemas exportados e reutilizados entre frontend e backend
