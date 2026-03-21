@@ -286,10 +286,11 @@ const FocusModal = ({ open, onClose, title, content }: FocusModalProps) => {
   );
 };
 
-const PromptsTab = ({ projectId }: { projectId: string }) => {
+const PromptsTab = ({ projectId, isWebsite }: { projectId: string; isWebsite: boolean }) => {
   const queryClient = useQueryClient();
   const { data: prompts, isLoading } = useProjectPrompts(projectId);
-  const [selectedType, setSelectedType] = useState("master");
+  const activeTypesList = isWebsite ? WEBSITE_PROMPT_TYPES_LIST : PROMPT_TYPES_LIST;
+  const [selectedType, setSelectedType] = useState(() => isWebsite ? "site_master" : "master");
   const [generatingTypes, setGeneratingTypes] = useState<Set<string>>(new Set());
   const [selectedVersions, setSelectedVersions] = useState<Record<string, number>>({});
   const [focusPrompt, setFocusPrompt] = useState<{ title: string; content: string } | null>(null);
@@ -297,17 +298,18 @@ const PromptsTab = ({ projectId }: { projectId: string }) => {
   // Group prompts by type, sorted by version DESC
   const promptsByType = useMemo(() => {
     const grouped: Record<string, typeof prompts extends undefined ? never[] : NonNullable<typeof prompts>> = {};
-    PROMPT_TYPES_LIST.forEach(t => { grouped[t.value] = []; });
+    activeTypesList.forEach(t => { grouped[t.value] = []; });
     (prompts ?? []).forEach(p => {
-      if (grouped[p.type]) grouped[p.type].push(p);
+      if (grouped[p.type] !== undefined) grouped[p.type].push(p);
+      else grouped[p.type] = [p];
     });
     Object.keys(grouped).forEach(type => {
       grouped[type].sort((a, b) => b.version - a.version);
     });
     return grouped;
-  }, [prompts]);
+  }, [prompts, activeTypesList]);
 
-  const currentTypeMeta = PROMPT_TYPES_LIST.find(t => t.value === selectedType)!;
+  const currentTypeMeta = activeTypesList.find(t => t.value === selectedType) ?? activeTypesList[0];
   const typePrompts = promptsByType[selectedType] ?? [];
   const latestVersion = typePrompts[0]?.version;
   const selectedVersion = selectedVersions[selectedType] ?? latestVersion;
