@@ -286,10 +286,11 @@ const FocusModal = ({ open, onClose, title, content }: FocusModalProps) => {
   );
 };
 
-const PromptsTab = ({ projectId }: { projectId: string }) => {
+const PromptsTab = ({ projectId, isWebsite }: { projectId: string; isWebsite: boolean }) => {
   const queryClient = useQueryClient();
   const { data: prompts, isLoading } = useProjectPrompts(projectId);
-  const [selectedType, setSelectedType] = useState("master");
+  const activeTypesList = isWebsite ? WEBSITE_PROMPT_TYPES_LIST : PROMPT_TYPES_LIST;
+  const [selectedType, setSelectedType] = useState(() => isWebsite ? "site_master" : "master");
   const [generatingTypes, setGeneratingTypes] = useState<Set<string>>(new Set());
   const [selectedVersions, setSelectedVersions] = useState<Record<string, number>>({});
   const [focusPrompt, setFocusPrompt] = useState<{ title: string; content: string } | null>(null);
@@ -297,17 +298,18 @@ const PromptsTab = ({ projectId }: { projectId: string }) => {
   // Group prompts by type, sorted by version DESC
   const promptsByType = useMemo(() => {
     const grouped: Record<string, typeof prompts extends undefined ? never[] : NonNullable<typeof prompts>> = {};
-    PROMPT_TYPES_LIST.forEach(t => { grouped[t.value] = []; });
+    activeTypesList.forEach(t => { grouped[t.value] = []; });
     (prompts ?? []).forEach(p => {
-      if (grouped[p.type]) grouped[p.type].push(p);
+      if (grouped[p.type] !== undefined) grouped[p.type].push(p);
+      else grouped[p.type] = [p];
     });
     Object.keys(grouped).forEach(type => {
       grouped[type].sort((a, b) => b.version - a.version);
     });
     return grouped;
-  }, [prompts]);
+  }, [prompts, activeTypesList]);
 
-  const currentTypeMeta = PROMPT_TYPES_LIST.find(t => t.value === selectedType)!;
+  const currentTypeMeta = activeTypesList.find(t => t.value === selectedType) ?? activeTypesList[0];
   const typePrompts = promptsByType[selectedType] ?? [];
   const latestVersion = typePrompts[0]?.version;
   const selectedVersion = selectedVersions[selectedType] ?? latestVersion;
@@ -362,7 +364,7 @@ const PromptsTab = ({ projectId }: { projectId: string }) => {
       {/* ── Type sub-tabs ─────────────────────────────────────────────────── */}
       <ScrollArea className="w-full" type="scroll">
         <div className="flex gap-1 border-b border-border pb-0 mb-0 overflow-x-auto">
-          {PROMPT_TYPES_LIST.map(t => {
+          {activeTypesList.map(t => {
             const tPrompts = promptsByType[t.value] ?? [];
             const hasPrompt = tPrompts.length > 0;
             const isGeneratingThis = generatingTypes.has(t.value);
@@ -1068,7 +1070,7 @@ const AIContentTabWrapper = ({
   onContentGenerated,
 }: {
   projectId: string;
-  contentType: "modules" | "database" | "rules";
+  contentType: "modules" | "database" | "rules" | "site_pages" | "site_copy" | "site_seo" | "site_structure";
   icon: React.ElementType;
   title: string;
   description: string;
@@ -1403,6 +1405,12 @@ const ProjectDetailPage = () => {
                 <span className={cn("px-2.5 py-1 rounded-full text-2xs font-semibold border", statusInfo.classes)}>
                   {statusInfo.label}
                 </span>
+                {isWebsite && (
+                  <span className="px-2.5 py-1 rounded-full text-2xs font-semibold bg-primary/10 text-primary border border-primary/25 flex items-center gap-1">
+                    <Globe className="w-2.5 h-2.5" />
+                    Site
+                  </span>
+                )}
                 {project.niche && (
                   <span className="px-2.5 py-1 rounded-full text-2xs font-medium bg-accent/10 text-accent border border-accent/20">
                     {project.niche}
@@ -1519,14 +1527,20 @@ const ProjectDetailPage = () => {
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.2 }}
           >
-            {activeTab === "overview"  && <OverviewTab project={project} />}
-            {activeTab === "idea"      && <IdeaTab idea={project.original_idea} />}
-            {activeTab === "prompts"   && <PromptsTab projectId={project.id} />}
-            {activeTab === "versions"  && <VersionsTab projectId={project.id} />}
-            {activeTab === "modules"   && <AIContentTabWrapper projectId={project.id} contentType="modules" icon={Puzzle} title="Módulos do Sistema" description="A IA decomporá o projeto em módulos bem definidos, com funcionalidades, dependências e complexidade de cada um." persistedContent={aiContentCache["modules"] ?? null} onContentGenerated={handleContentGenerated} />}
-            {activeTab === "screens"   && <ScreensTabWrapper projectId={project.id} persistedContent={aiContentCache["screens"] ?? null} onContentGenerated={handleContentGenerated} projectMetadata={(project.metadata as Record<string, unknown>) ?? {}} onUpdateMetadata={(patch) => updateProject.mutate({ metadata: patch as never, _silent: true } as never)} projectPlatform={project.platform ?? undefined} />}
-            {activeTab === "database"  && <AIContentTabWrapper projectId={project.id} contentType="database" icon={Database} title="Esquema do Banco de Dados" description="A IA gerará o schema SQL completo com tabelas, relacionamentos, índices e RLS policies." persistedContent={aiContentCache["database"] ?? null} onContentGenerated={handleContentGenerated} />}
-            {activeTab === "rules"     && <AIContentTabWrapper projectId={project.id} contentType="rules" icon={ScrollText} title="Regras de Negócio" description="A IA documentará todas as regras de negócio, validações e fluxos condicionais do sistema." persistedContent={aiContentCache["rules"] ?? null} onContentGenerated={handleContentGenerated} />}
+            {activeTab === "overview"   && <OverviewTab project={project} />}
+            {activeTab === "idea"       && <IdeaTab idea={project.original_idea} />}
+            {activeTab === "prompts"    && <PromptsTab projectId={project.id} isWebsite={isWebsite} />}
+            {activeTab === "versions"   && <VersionsTab projectId={project.id} />}
+            {/* System tabs */}
+            {activeTab === "modules"   && !isWebsite && <AIContentTabWrapper projectId={project.id} contentType="modules" icon={Puzzle} title="Módulos do Sistema" description="A IA decomporá o projeto em módulos bem definidos, com funcionalidades, dependências e complexidade de cada um." persistedContent={aiContentCache["modules"] ?? null} onContentGenerated={handleContentGenerated} />}
+            {activeTab === "screens"   && !isWebsite && <ScreensTabWrapper projectId={project.id} persistedContent={aiContentCache["screens"] ?? null} onContentGenerated={handleContentGenerated} projectMetadata={(project.metadata as Record<string, unknown>) ?? {}} onUpdateMetadata={(patch) => updateProject.mutate({ metadata: patch as never, _silent: true } as never)} projectPlatform={project.platform ?? undefined} />}
+            {activeTab === "database"  && !isWebsite && <AIContentTabWrapper projectId={project.id} contentType="database" icon={Database} title="Esquema do Banco de Dados" description="A IA gerará o schema SQL completo com tabelas, relacionamentos, índices e RLS policies." persistedContent={aiContentCache["database"] ?? null} onContentGenerated={handleContentGenerated} />}
+            {activeTab === "rules"     && !isWebsite && <AIContentTabWrapper projectId={project.id} contentType="rules" icon={ScrollText} title="Regras de Negócio" description="A IA documentará todas as regras de negócio, validações e fluxos condicionais do sistema." persistedContent={aiContentCache["rules"] ?? null} onContentGenerated={handleContentGenerated} />}
+            {/* Website tabs */}
+            {activeTab === "pages"     && isWebsite && <AIContentTabWrapper projectId={project.id} contentType="site_pages" icon={Monitor} title="Páginas e Seções do Site" description="A IA detalhará cada página e seção: layout, componentes, textos e CTAs." persistedContent={aiContentCache["site_pages"] ?? null} onContentGenerated={handleContentGenerated} />}
+            {activeTab === "copy"      && isWebsite && <AIContentTabWrapper projectId={project.id} contentType="site_copy" icon={ScrollText} title="Copywriting e Textos" description="Textos persuasivos para cada seção, adaptados ao tom de comunicação escolhido." persistedContent={aiContentCache["site_copy"] ?? null} onContentGenerated={handleContentGenerated} />}
+            {activeTab === "seo"       && isWebsite && <AIContentTabWrapper projectId={project.id} contentType="site_seo" icon={TrendingUp} title="Estratégia SEO" description="Keywords, meta tags, schema markup e checklist técnico de SEO." persistedContent={aiContentCache["site_seo"] ?? null} onContentGenerated={handleContentGenerated} />}
+            {activeTab === "structure" && isWebsite && <AIContentTabWrapper projectId={project.id} contentType="site_structure" icon={Code2} title="Arquitetura e Estrutura" description="Stack técnica, estrutura de pastas, componentes e configuração de deploy." persistedContent={aiContentCache["site_structure"] ?? null} onContentGenerated={handleContentGenerated} />}
             {activeTab === "exports"   && <InlineExportTab project={project} />}
             {activeTab === "eval"      && <EvalTab projectId={project.id} currentScore={project.quality_score} />}
             {activeTab === "ai"        && <AIReviewTab projectId={project.id} />}

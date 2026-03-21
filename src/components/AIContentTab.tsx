@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import AIStreamingIndicator from "@/components/AIStreamingIndicator";
 
 interface AIContentTabProps {
-  contentType: "modules" | "screens" | "database" | "rules";
+  contentType: "modules" | "screens" | "database" | "rules" | "site_pages" | "site_copy" | "site_seo" | "site_structure";
   projectId: string;
   icon: React.ElementType;
   title: string;

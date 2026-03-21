@@ -173,6 +173,38 @@ const LandingPage = () => {
               </span>
             ))}
           </motion.div>
+
+          {/* App mockup */}
+          <motion.div
+            initial={{ opacity: 0, y: 32 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.9 }}
+            className="mt-16 relative mx-auto max-w-4xl"
+          >
+            {/* Glow behind image */}
+            <div className="absolute inset-x-8 top-4 h-full bg-primary/20 blur-3xl rounded-3xl pointer-events-none" />
+            <div className="relative rounded-2xl border border-border/60 overflow-hidden shadow-[0_32px_80px_-16px_hsl(var(--primary)/0.35)] ring-1 ring-border/30">
+              {/* Browser chrome bar */}
+              <div className="flex items-center gap-2 px-4 py-3 bg-card/90 border-b border-border/50 backdrop-blur-sm">
+                <div className="flex gap-1.5">
+                  <span className="w-3 h-3 rounded-full bg-destructive/60" />
+                  <span className="w-3 h-3 rounded-full bg-warning/60" />
+                  <span className="w-3 h-3 rounded-full bg-success/60" />
+                </div>
+                <div className="flex-1 mx-4">
+                  <div className="bg-muted/50 rounded-md px-3 py-1 text-2xs text-muted-foreground font-mono max-w-xs mx-auto text-center border border-border/40">
+                    app.arquitetoai.com
+                  </div>
+                </div>
+              </div>
+              <img
+                src="/src/assets/mockup-landing.png"
+                alt="Interface do Arquiteto IA — visão geral do dashboard de projeto"
+                className="w-full object-cover object-top"
+                loading="lazy"
+              />
+            </div>
+          </motion.div>
         </div>
       </section>
 
