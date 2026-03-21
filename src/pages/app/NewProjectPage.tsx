@@ -1068,7 +1068,13 @@ const StepConfirmacaoSite = () => {
 
   const typeLabel = WEBSITE_TYPES.find(t => t.value === type)?.label ?? type;
   const styleLabel = WEBSITE_STYLES.find(s => s.value === websiteStyle)?.label ?? websiteStyle;
-  const derivedTitle = title || `${niche ? niche + " — " : ""}${typeLabel || "Site"}`;
+  // BUG 7 FIX: avoid redundant title when niche matches type (e.g. "Agência — Agência / Freela")
+  const nicheNormW = (niche ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const typeNormW = (typeLabel || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const nichePrefixW = niche && !nicheNormW.startsWith(typeNormW) && !typeNormW.startsWith(nicheNormW)
+    ? `${niche} — `
+    : "";
+  const derivedTitle = title || `${nichePrefixW}${typeLabel || "Site"}`;
 
   const handleCreate = () => {
     createProject(
