@@ -17,6 +17,7 @@ import CommandPalette from "@/components/CommandPalette";
 const AppHeader = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [cmdOpen, setCmdOpen] = useState(false);
 
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem("theme");
