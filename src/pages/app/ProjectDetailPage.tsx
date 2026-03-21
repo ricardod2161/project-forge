@@ -371,6 +371,12 @@ const PromptsTab = ({ projectId, isWebsite }: { projectId: string; isWebsite: bo
   const [selectedVersions, setSelectedVersions] = useState<Record<string, number>>({});
   const [focusPrompt, setFocusPrompt] = useState<{ title: string; content: string } | null>(null);
 
+  // BUG 2 FIX: sync selectedType when isWebsite changes (e.g. navigating between projects)
+  useEffect(() => {
+    setSelectedType(isWebsite ? "site_master" : "master");
+    setSelectedVersions({});
+  }, [isWebsite]);
+
   // Group prompts by type, sorted by version DESC
   const promptsByType = useMemo(() => {
     const grouped: Record<string, typeof prompts extends undefined ? never[] : NonNullable<typeof prompts>> = {};
