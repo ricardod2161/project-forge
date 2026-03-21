@@ -3,10 +3,65 @@
  * Utilitários de IA multi-provedor para o Project Forge.
  *
  * Provedores:
- *  - Groq   → chamadas de texto baratas / rápidas (free tier generoso)
- *  - Gemini → fallback e geração de conteúdo longo (free tier Google AI)
- *  - OpenAI → tool calling estruturado (gpt-4o-mini)
+ *  - Lovable AI Gateway → principal (Gemini 2.5 Flash — sem cota gratuita limitada)
+ *  - Groq               → rápido e barato para textos curtos/médios
+ *  - Gemini direto      → legado, mantido para compatibilidade
+ *  - OpenAI             → tool calling estruturado (gpt-4o-mini)
  */
+
+// ── Lovable AI Gateway ────────────────────────────────────────────────────────
+
+export async function callLovableAI(
+  systemPrompt: string,
+  userPrompt: string,
+  options?: {
+    model?: string;
+    maxTokens?: number;
+    temperature?: number;
+  }
+): Promise<string> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurado");
+
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: options?.model ?? "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user",   content: userPrompt   },
+      ],
+      temperature: options?.temperature ?? 0.7,
+      max_tokens:  options?.maxTokens   ?? 8192,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    if (res.status === 429) {
+      throw Object.assign(
+        new Error("Limite de requisições Lovable AI atingido. Aguarde alguns instantes."),
+        { status: 429 }
+      );
+    }
+    if (res.status === 402) {
+      throw Object.assign(
+        new Error("Créditos Lovable AI esgotados. Adicione créditos em Settings → Workspace."),
+        { status: 402 }
+      );
+    }
+    throw Object.assign(new Error(`Lovable AI error: ${res.status} — ${errText}`), { status: res.status });
+  }
+
+  const data = await res.json();
+  const content = data.choices?.[0]?.message?.content ?? "";
+  if (!content) throw new Error("Lovable AI não retornou conteúdo");
+  return content;
+}
 
 // ── Groq ─────────────────────────────────────────────────────────────────────
 
@@ -58,7 +113,7 @@ export async function callGroq(
   return { content, toolCall };
 }
 
-// ── Google AI (Gemini 2.0 Flash) ──────────────────────────────────────────────
+// ── Google AI (Gemini 2.0 Flash) — legado ────────────────────────────────────
 
 export async function callGemini(
   prompt: string,
@@ -140,7 +195,7 @@ export async function callOpenAIWithTools(
   return data.choices?.[0]?.message?.tool_calls?.[0];
 }
 
-// ── Fallback inteligente: Groq → Gemini ───────────────────────────────────────
+// ── Fallback inteligente: Groq → Lovable AI ───────────────────────────────────
 
 export async function callAIWithFallback(
   systemPrompt: string,
@@ -149,10 +204,10 @@ export async function callAIWithFallback(
   temperature   = 0.7,
   groqModel     = "llama-3.3-70b-versatile"
 ): Promise<string> {
-  const GROQ_API_KEY  = Deno.env.get("GROQ_API_KEY");
-  const GOOGLE_AI_KEY = Deno.env.get("GOOGLE_AI_KEY");
+  const GROQ_API_KEY    = Deno.env.get("GROQ_API_KEY");
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-  // Tentativa 1: Groq
+  // Tentativa 1: Groq (rápido e barato)
   if (GROQ_API_KEY) {
     try {
       const { content } = await callGroq(systemPrompt, userPrompt, {
@@ -161,15 +216,15 @@ export async function callAIWithFallback(
       if (content.length > 50) return content;
     } catch (err: unknown) {
       const status = (err as { status?: number }).status;
-      if (status !== 429) throw err; // só faz fallback em rate limit
-      console.warn("Groq rate limit (429), usando fallback Google AI…");
+      if (status !== 429) throw err;
+      console.warn("Groq rate limit (429), usando fallback Lovable AI Gateway…");
     }
   }
 
-  // Tentativa 2: Gemini (fallback)
-  if (GOOGLE_AI_KEY) {
-    return callGemini(`${systemPrompt}\n\n${userPrompt}`, { maxTokens, temperature });
+  // Tentativa 2: Lovable AI Gateway (principal fallback — sem cota limitada)
+  if (LOVABLE_API_KEY) {
+    return callLovableAI(systemPrompt, userPrompt, { maxTokens, temperature });
   }
 
-  throw new Error("Nenhum provedor de IA configurado. Adicione GROQ_API_KEY ou GOOGLE_AI_KEY.");
+  throw new Error("Nenhum provedor de IA disponível. Tente novamente em alguns instantes.");
 }

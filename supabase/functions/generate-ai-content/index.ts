@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { callGemini } from "../_shared/ai-providers.ts";
+import { callLovableAI, callGroq } from "../_shared/ai-providers.ts";
 
 const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
 const corsHeaders = {
@@ -265,11 +265,25 @@ Linguagem: português brasileiro técnico-profissional.`;
 ${websiteContext}
 Gere documentação profissional, completa e altamente específica para este projeto.`;
 
-    // Gemini 2.0 Flash: contexto 1M tokens, ideal para geração de conteúdo longo
-    const content = await callGemini(`${systemPrompt}\n\n${userPrompt}`, {
-      maxTokens: 8192,
-      temperature: 0.7,
-    });
+    // Lovable AI Gateway (Gemini 2.5 Flash) — sem limites de cota gratuita
+    // Fallback automático via callLovableAI se Groq não disponível
+    let content: string;
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+    
+    if (GROQ_API_KEY && (content_type === "modules" || content_type === "rules" || content_type === "site_seo")) {
+      // Tipos menores → Groq (mais rápido, até 8k tokens)
+      try {
+        const result = await callGroq(systemPrompt, userPrompt, { maxTokens: 6000, temperature: 0.7 });
+        content = result.content;
+        if (content.length < 100) throw new Error("Resposta muito curta, usando Lovable AI");
+      } catch (_groqErr) {
+        // Fallback para Lovable AI
+        content = await callLovableAI(systemPrompt, userPrompt, { maxTokens: 8192, temperature: 0.7 });
+      }
+    } else {
+      // Tipos longos (screens, database, site_pages, site_copy, site_structure) → Lovable AI
+      content = await callLovableAI(systemPrompt, userPrompt, { maxTokens: 8192, temperature: 0.7 });
+    }
 
     return new Response(JSON.stringify({ content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -279,13 +293,13 @@ Gere documentação profissional, completa e altamente específica para este pro
     console.error("generate-ai-content error:", err);
     const status = (err as { status?: number }).status;
     if (status === 429) {
-      return new Response(JSON.stringify({ error: "Limite de requisições Google AI atingido. Aguarde alguns minutos e tente novamente." }), {
+      return new Response(JSON.stringify({ error: "Limite de requisições atingido. Aguarde alguns instantes e tente novamente." }), {
         status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (status === 403) {
-      return new Response(JSON.stringify({ error: "GOOGLE_AI_KEY inválida ou sem permissão. Verifique em aistudio.google.com." }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (status === 402) {
+      return new Response(JSON.stringify({ error: "Créditos de IA esgotados. Contate o suporte." }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Erro interno" }), {
