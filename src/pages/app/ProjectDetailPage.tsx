@@ -618,6 +618,177 @@ const AIReviewTab = ({ projectId }: { projectId: string }) => {
   );
 };
 
+// ── Tab: AI Evaluate ─────────────────────────────────────────────────────────
+interface EvalDimension {
+  name: string;
+  score: number;
+  justification: string;
+  recommendations: string[];
+}
+interface EvalResult {
+  dimensions: EvalDimension[];
+  overall_score: number;
+  summary: string;
+  top_priorities: string[];
+}
+
+const EvalTab = ({ projectId, currentScore }: { projectId: string; currentScore: number | null }) => {
+  const queryClient = useQueryClient();
+  const [result, setResult] = useState<EvalResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleEvaluate = async () => {
+    setIsLoading(true);
+    setResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("evaluate-project", {
+        body: { project_id: projectId },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        if (data.error.includes("429") || data.error.includes("Limite")) toast.error("Limite de requisições atingido.");
+        else if (data.error.includes("402") || data.error.includes("Créditos")) toast.error("Créditos insuficientes.");
+        else toast.error(data.error);
+        return;
+      }
+      setResult(data.evaluation);
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("Avaliação concluída! Score salvo no projeto.");
+    } catch (err) {
+      toast.error("Erro ao avaliar projeto.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const radarData = result?.dimensions.map(d => ({ subject: d.name, score: d.score })) ?? [];
+
+  if (!isLoading && !result) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col items-center justify-center py-16 rounded-xl border border-dashed border-border gap-5">
+        <div className="w-14 h-14 rounded-2xl bg-primary/8 border border-primary/15 flex items-center justify-center">
+          <BarChart3 className="w-6 h-6 text-primary/60" />
+        </div>
+        <div className="text-center max-w-sm">
+          <h3 className="text-sm font-semibold text-foreground mb-2">Score de Qualidade</h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Avalie seu projeto em 7 dimensões: Escopo, Estrutura, Técnico, Completude, Viabilidade, Monetização e Maturidade.
+            {currentScore !== null && <span className="block mt-2 text-primary font-medium">Score atual: {currentScore}/100</span>}
+          </p>
+        </div>
+        <button
+          onClick={handleEvaluate}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-[0.98] transition-all shadow-sm"
+        >
+          <BarChart3 className="w-4 h-4" />
+          {currentScore !== null ? "Reavaliar Projeto" : "Calcular Score com IA"}
+        </button>
+      </motion.div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+        <div className="flex items-center justify-center py-10">
+          <AIStreamingIndicator label="IA avaliando projeto em 7 dimensões..." size="md" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[1,2,3,4,5,6,7].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+      className="space-y-5">
+      {/* Score geral */}
+      <div className="p-5 rounded-xl border border-border bg-card flex items-center gap-6">
+        <ScoreRing score={result!.overall_score} size="md" showLabel />
+        <div className="flex-1 min-w-0">
+          <h3 className="text-xs font-semibold text-foreground mb-1">Score Geral</h3>
+          <p className="text-2xs text-muted-foreground leading-relaxed">{result!.summary}</p>
+        </div>
+        <button onClick={handleEvaluate}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:border-primary/40 text-2xs text-muted-foreground hover:text-primary transition-all flex-shrink-0">
+          <RefreshCw className="w-3 h-3" />
+          Reavaliar
+        </button>
+      </div>
+
+      {/* Radar chart */}
+      {radarData.length > 0 && (
+        <div className="p-5 rounded-xl border border-border bg-card">
+          <h4 className="text-xs font-semibold text-foreground mb-4">Mapa de Dimensões</h4>
+          <ResponsiveContainer width="100%" height={220}>
+            <RadarChart data={radarData}>
+              <PolarGrid stroke="hsl(var(--border))" />
+              <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+              <Radar name="Score" dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.2} />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Dimensões detalhadas */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {result!.dimensions.map(dim => (
+          <div key={dim.name} className="p-4 rounded-xl border border-border bg-card">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-foreground">{dim.name}</span>
+              <span className={cn("text-xs font-bold",
+                dim.score >= 80 ? "text-success" : dim.score >= 60 ? "text-primary" : dim.score >= 40 ? "text-warning" : "text-destructive"
+              )}>{dim.score}/100</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-2">
+              <motion.div
+                className={cn("h-full rounded-full",
+                  dim.score >= 80 ? "bg-success" : dim.score >= 60 ? "bg-primary" : dim.score >= 40 ? "bg-warning" : "bg-destructive"
+                )}
+                initial={{ width: 0 }}
+                animate={{ width: `${dim.score}%` }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+              />
+            </div>
+            <p className="text-2xs text-muted-foreground leading-relaxed">{dim.justification}</p>
+            {dim.recommendations.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {dim.recommendations.slice(0, 2).map((rec, i) => (
+                  <li key={i} className="text-2xs text-muted-foreground flex items-start gap-1.5">
+                    <span className="text-primary mt-0.5">›</span>
+                    {rec}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Prioridades */}
+      {result!.top_priorities.length > 0 && (
+        <div className="p-5 rounded-xl border border-primary/20 bg-primary/5">
+          <h4 className="text-xs font-semibold text-foreground mb-3 flex items-center gap-2">
+            <TrendingUp className="w-3.5 h-3.5 text-primary" />
+            Principais Prioridades
+          </h4>
+          <ul className="space-y-2">
+            {result!.top_priorities.map((p, i) => (
+              <li key={i} className="flex items-start gap-2 text-2xs text-foreground">
+                <span className="font-bold text-primary w-4 flex-shrink-0">{i + 1}.</span>
+                {p}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
 // ── Tab: Versions ─────────────────────────────────────────────────────────────
 const VersionsTab = ({ projectId }: { projectId: string }) => {
   const { data: versions, isLoading } = useProjectVersions(projectId);
