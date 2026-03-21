@@ -1116,7 +1116,10 @@ const VersionsTab = ({ projectId }: { projectId: string }) => {
   const handleCreateVersion = async () => {
     setIsCreating(true);
     try {
-      const nextVersion = (versions?.length ?? 0) + 1;
+      // BUG 8 FIX: use max version_number to handle gaps from deletions
+      const nextVersion = versions && versions.length > 0
+        ? Math.max(...versions.map(v => v.version_number)) + 1
+        : 1;
       const { error } = await supabase
         .from("project_versions")
         .insert({
