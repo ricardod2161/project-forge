@@ -900,7 +900,97 @@ const AIContentTabWrapper = ({
   );
 };
 
-// ── Main Component ─────────────────────────────────────────────────────────────
+// ── Tab: Inline Export ───────────────────────────────────────────────────────
+const generateDocFromProject = (project: Project): string => {
+  const lines: string[] = [];
+  const line = (s: string) => lines.push(s);
+  const br = () => lines.push("");
+  line(`# ${project.title}`);
+  br();
+  line(`**Status:** ${project.status === "active" ? "Ativo" : project.status === "draft" ? "Rascunho" : "Arquivado"}`);
+  if (project.type)       line(`**Tipo:** ${project.type}`);
+  if (project.niche)      line(`**Nicho:** ${project.niche}`);
+  if (project.platform)   line(`**Plataforma:** ${project.platform}`);
+  if (project.complexity !== null && project.complexity !== undefined) line(`**Complexidade:** ${project.complexity}/5`);
+  br();
+  if (project.original_idea) { line(`## Ideia Original`); br(); line(project.original_idea); br(); }
+  if (project.description)   { line(`## Descrição`); br(); line(project.description); br(); }
+  if (project.audience)      { line(`## Público-Alvo`); br(); line(project.audience); br(); }
+  if (project.features && project.features.length > 0) {
+    line(`## Funcionalidades`); br();
+    project.features.forEach(f => line(`- ${f}`));
+    br();
+  }
+  if (project.integrations && project.integrations.length > 0) {
+    line(`## Integrações`); br();
+    project.integrations.forEach(i => line(`- ${i}`));
+    br();
+  }
+  if (project.monetization) { line(`## Modelo de Monetização`); br(); line(project.monetization); br(); }
+  line(`---`);
+  line(`*Gerado em ${new Date().toLocaleDateString("pt-BR")} · Arquiteto IA*`);
+  return lines.join("\n");
+};
+
+const InlineExportTab = ({ project }: { project: Project }) => {
+  const [copied, setCopied] = useState(false);
+  const docContent = generateDocFromProject(project);
+  const fileName = `${project.slug ?? project.title.toLowerCase().replace(/\s+/g, "-")}.md`;
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(docContent);
+    setCopied(true);
+    toast.success("Documentação copiada!");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([docContent], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Arquivo baixado!");
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+      className="space-y-4">
+      {/* Actions */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <button onClick={handleCopy}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-border hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-all">
+          {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
+          {copied ? "Copiado!" : "Copiar Markdown"}
+        </button>
+        <button onClick={handleDownload}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-all">
+          <Download className="w-3.5 h-3.5" />
+          Baixar .md
+        </button>
+      </div>
+      {/* Preview */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-2">
+            <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-2xs font-medium text-muted-foreground">{fileName}</span>
+          </div>
+          <span className="text-2xs text-muted-foreground">{docContent.length} caracteres</span>
+        </div>
+        <pre className="p-5 text-2xs text-foreground leading-relaxed whitespace-pre-wrap font-mono overflow-auto max-h-[480px]">
+          {docContent}
+        </pre>
+      </div>
+    </motion.div>
+  );
+};
+
+
 const ProjectDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
