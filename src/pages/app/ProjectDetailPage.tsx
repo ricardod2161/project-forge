@@ -362,7 +362,7 @@ const PromptsTab = ({ projectId }: { projectId: string }) => {
       {/* ── Type sub-tabs ─────────────────────────────────────────────────── */}
       <ScrollArea className="w-full" type="scroll">
         <div className="flex gap-1 border-b border-border pb-0 mb-0 overflow-x-auto">
-          {PROMPT_TYPES_LIST.map(t => {
+          {activeTypesList.map(t => {
             const tPrompts = promptsByType[t.value] ?? [];
             const hasPrompt = tPrompts.length > 0;
             const isGeneratingThis = generatingTypes.has(t.value);
