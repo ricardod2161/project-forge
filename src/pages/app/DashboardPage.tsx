@@ -60,9 +60,9 @@ const DashboardPage = () => {
       icon: FolderOpen,
     },
     {
-      label: "Projetos Ativos",
-      value: metricsLoading ? "…" : String(metrics?.activeProjects ?? 0),
-      icon: TrendingUp,
+      label: "Favoritos",
+      value: metricsLoading ? "…" : String(metrics?.favoriteProjects ?? 0),
+      icon: Star,
     },
     {
       label: "Prompts Gerados",

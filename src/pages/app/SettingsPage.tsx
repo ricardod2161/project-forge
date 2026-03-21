@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { User, Palette, Bell, CreditCard, Shield, Sun, Moon, Save, Check, Lock } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useAppTheme } from "@/hooks/useAppTheme";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";

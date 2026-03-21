@@ -6,14 +6,14 @@ import {
   Monitor, Database, ScrollText, Zap, Download, BarChart3, History,
   Bot, MoreHorizontal, Trash2, Archive, Edit3, Tag, Users, Globe, Puzzle,
   RefreshCw, AlertTriangle, AlertCircle, Lightbulb as LightbulbIcon, TrendingUp, ShieldAlert,
-  Plus, Loader2, RadarIcon,
+  Plus, Loader2, FileText, ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useProjectDetail, useProjectPrompts, useProjectVersions, useUpdateProject, useDeleteProject } from "@/hooks/useProjectDetail";
-import { useToggleFavorite } from "@/hooks/useProjects";
+import { useToggleFavorite, type Project } from "@/hooks/useProjects";
 import AIStreamingIndicator from "@/components/AIStreamingIndicator";
 import AIContentTab from "@/components/AIContentTab";
 import ScoreRing from "@/components/ScoreRing";
