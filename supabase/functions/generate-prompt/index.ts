@@ -9,258 +9,559 @@ const corsHeaders = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PROMPT TYPES — SISTEMAS / APPS
+// NÍVEL 1 — PROMPT MESTRE (Contexto + Stack + Rotas + Regras)
+// Escopo EXCLUSIVO: objetivo, público, stack, rotas, tokens CSS, regras.
+// NÃO contém: código de componentes, schema SQL, copywriting, deploy.
 // ─────────────────────────────────────────────────────────────────────────────
+
 const PROMPT_TYPES: Record<string, { title: string; platform: string; instructions: string }> = {
 
   "master": {
-    title: "Prompt Mestre Lovable",
+    title: "Prompt Mestre — Contexto & Arquitetura",
     platform: "Lovable",
-    instructions: `Crie um prompt mestre COMPLETO e ULTRA-DETALHADO para construir o sistema do zero no Lovable. O prompt deve cobrir TODOS os aspectos abaixo com especificidade cirúrgica:
+    instructions: `Crie o PROMPT MESTRE do sistema. Escopo EXCLUSIVO: define o contexto, stack, rotas e regras que todos os outros módulos devem seguir. Não gere código de componente, schema SQL completo ou copywriting — isso fica nos módulos específicos.
 
-STACK TÉCNICA (obrigatório especificar versões):
-- Framework: React 18 + Vite + TypeScript strict
-- Estilização: Tailwind CSS v3 + shadcn/ui + CSS Variables no index.css
-- Estado global: Zustand para UI, TanStack Query v5 para dados assíncronos
-- Backend: Supabase (Auth JWT, PostgreSQL, Storage, Edge Functions Deno)
-- Roteamento: React Router v6 com rotas protegidas via ProtectedRoute
-- Validação: Zod schemas em todos os formulários + react-hook-form
-- Animações: Framer Motion (apenas acima da dobra, com prefers-reduced-motion)
+## 1. CONTEXTO DO PROJETO
+- Qual problema real o sistema resolve (1 parágrafo específico ao nicho)
+- Quem usa o sistema: persona primária + secundária com comportamentos reais
+- Proposta de valor única: o que diferencia de soluções existentes no mercado
+- Diferenciais competitivos (mínimo 3, específicos ao nicho)
 
-DESIGN SYSTEM COMPLETO (valores HEX reais — não genéricos):
-- Definir em index.css as variáveis CSS: --primary, --secondary, --accent, --background, --foreground, --muted, --border, --destructive com valores HSL reais
-- Tipografia: especificar Google Fonts + pesos (ex: "Plus Jakarta Sans" 500/600/700/800)
-- Escala tipográfica completa: H1 a H6 com tamanhos Tailwind, line-height e font-weight
-- Variantes de Button: primary, secondary, ghost, destructive com classes Tailwind exatas
-- Padrão de Card: border, radius, sombra, hover state
-- Microinterações: padrão global de animação de entrada (opacity + translateY, ease, duração)
+## 2. STACK TÉCNICA (com versões)
+- React 18 + Vite 5 + TypeScript 5 strict (tsconfig: strictNullChecks, noImplicitAny)
+- Tailwind CSS v3 + shadcn/ui — NUNCA hardcode de cor no JSX
+- TanStack Query v5 para dados async, Zustand v4 para estado global de UI
+- Supabase (Auth JWT, PostgreSQL 15, Storage, Edge Functions Deno 1.x)
+- React Router v6 — rotas protegidas via ProtectedRoute + PublicOnlyRoute
+- Validação: Zod v3 em TODOS os formulários + react-hook-form + zodResolver
+- Animações: Framer Motion v11 (apenas above-the-fold, com prefers-reduced-motion)
+- Toasts: sonner
 
-ESTRUTURA DE ROTAS (todas as rotas do sistema com guards):
-- Listar cada rota: path, componente, guard (público/autenticado/admin), dados carregados
-- Ex: /dashboard → SSR-like via useQuery + ProtectedRoute + dados do perfil + projetos
+## 3. DESIGN TOKENS (CSS variables — não código de componente)
+Definir APENAS em src/index.css as variáveis HSL:
+:root {
+  --background:           [H S% L%]; /* ex: 222 47% 11% */
+  --foreground:           [H S% L%];
+  --primary:              [H S% L%]; /* cor principal da marca */
+  --primary-foreground:   [H S% L%];
+  --secondary:            [H S% L%];
+  --secondary-foreground: [H S% L%];
+  --muted:                [H S% L%];
+  --muted-foreground:     [H S% L%];
+  --accent:               [H S% L%];
+  --accent-foreground:    [H S% L%];
+  --destructive:          [H S% L%];
+  --border:               [H S% L%];
+  --card:                 [H S% L%];
+  --card-foreground:      [H S% L%];
+  --radius: 0.75rem;
+}
+.dark { /* variáveis invertidas para dark mode */ }
+Tipografia: apenas as fontes e pesos (code completo de tipografia vai para o módulo Frontend).
 
-SCHEMA DO BANCO (SQL completo):
-- Cada tabela com: CREATE TABLE, tipos de dados PostgreSQL, DEFAULT, NOT NULL, FK
-- RLS policies por tabela: SELECT/INSERT/UPDATE/DELETE com auth.uid()
-- Índices justificados (ex: CREATE INDEX idx_projects_user_id ON projects(user_id))
-- Triggers necessários (updated_at automático, etc.)
-- Enums PostgreSQL se aplicável
+## 4. MAPA DE ROTAS E GUARDS
+Para cada rota, especificar:
+- Path, componente responsável, guard (público / autenticado / admin)
+- Dados carregados: tabela Supabase + campos do select
+- Rendering strategy: Client-side / SSR-like via useQuery
+Exemplo de nível esperado:
+/dashboard → <DashboardPage> | guard: autenticado | dados: projects(id,title,status,updated_at), profiles(plan) | loading: skeleton cards
 
-MÓDULOS E FUNCIONALIDADES (cada módulo com sub-features):
-- Listar cada módulo do sistema com: descrição, componentes React, hooks, queries Supabase
+## 5. MÓDULOS DO SISTEMA (visão geral — sem código)
+Listar cada módulo com: nome, responsabilidade em 1 frase, quais páginas/rotas usa, quais tabelas toca.
+(Código detalhado de cada módulo fica no Prompt Frontend, Backend ou Banco)
 
-AUTENTICAÇÃO COMPLETA:
-- Fluxo: cadastro (email+senha), login, recuperação de senha, sessão persistente
-- Guards: ProtectedRoute + middleware para rotas admin
-- Profile automático via trigger handle_new_user() no banco
+## 6. REGRAS DE IMPLEMENTAÇÃO (críticas e verificáveis)
+REGRAS TYPESCRIPT:
+- Nunca usar `any` — tipos específicos ou `unknown` com narrowing
+- Tipar responses Supabase: Database['public']['Tables']['tabela']['Row']
+- Interfaces para objetos, type para unions e primitivos
 
-API / EDGE FUNCTIONS (cada função com especificação completa):
-- Nome, método HTTP, body esperado com tipos TypeScript, validação Zod, ações, resposta 200/400/500
-
-VARIÁVEIS DE AMBIENTE (todas necessárias com comentário de onde obter):
-- VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY, LOVABLE_API_KEY, etc.
-
-ESTADOS DE UI OBRIGATÓRIOS em cada módulo:
+REGRAS DE UI:
+- Nunca hardcode de cor no JSX (sempre hsl(var(--primary)))
 - Loading: Skeleton com mesma estrutura do conteúdo real
-- Empty state: ícone + mensagem + CTA contextual
-- Error: mensagem inline + retry
-- Success: toast sonner ou mensagem inline
+- Empty state: ícone Lucide relevante + título + subtítulo + CTA
+- Error: Alert + mensagem amigável + retry button
 
-CHECKLIST DE ENTREGA (mínimo 25 itens concretos e verificáveis):
-- Cada item deve ser verificável em produção (não genérico)
-- Ex: "Login com email válido redireciona para /dashboard" ✓
-- Ex: "Rota /admin bloqueia usuário com role=user" ✓`
+REGRAS DE DADOS:
+- RLS habilitado em todas as tabelas
+- Zod validation em todos os formulários (cliente E servidor)
+- useQuery com staleTime adequado ao tipo de dado
+- Invalidar queryClient após toda mutation
+
+REGRAS DE AUTH:
+- Nunca armazenar JWT em localStorage — Supabase gerencia cookie
+- ProtectedRoute: verificar session antes de renderizar
+- Redirecionar /login após expiração de sessão
+
+## 7. CHECKLIST DE ENTREGA (20+ itens verificáveis)
+Cada item deve ser testável em produção — não genérico.
+Exemplos do nível esperado:
+- [ ] Login com email válido redireciona para /dashboard em < 2s
+- [ ] Rota /admin bloqueia usuário com role=user e redireciona para /dashboard
+- [ ] Formulário de cadastro mostra erro inline se email já existe
+- [ ] Todas as queries retornam apenas dados do usuário autenticado (RLS validado)
+- [ ] Skeleton aparece durante carregamento, nunca spinner genérico
+[Gerar 20+ itens específicos para este projeto e nicho]`,
   },
 
-  "frontend": {
-    title: "Frontend Completo",
-    platform: "Lovable",
-    instructions: `Gere um prompt ULTRA-DETALHADO de frontend React para este sistema. Especifique cada componente, estado e interação:
-
-DESIGN SYSTEM EM CÓDIGO (implementar em index.css + tailwind.config.ts):
-- CSS Variables com valores HSL reais: --primary: X X% X%, --accent: X X% X%, etc.
-- Google Fonts: especificar família, pesos, subset=latin, display=swap via @import
-- Tailwind config: fontFamily com as fontes escolhidas, extend.colors mapeando as CSS vars
-- Componentes shadcn/ui a instalar: lista exata (Button, Card, Dialog, Form, Input, etc.)
-
-ESTRUTURA DE COMPONENTES (árvore completa):
-- pages/: uma por rota, responsável por layout e composição
-- components/ui/: shadcn customizados
-- components/[feature]/: componentes específicos de cada módulo
-- hooks/: um hook por recurso de dados (useProjects, useAuth, useProfile, etc.)
-- lib/: utils.ts, validations.ts (Zod schemas), supabase.ts
-
-CADA PÁGINA (especificar):
-- Nome do arquivo, rota correspondente, guard (público/autenticado)
-- Seções/componentes que compõem a página
-- Dados carregados (useQuery key, tabela Supabase, select fields)
-- Estados: loading skeleton, empty state, error state
-- Animações de entrada (Framer Motion: fade-up com stagger se lista de cards)
-
-FORMULÁRIOS (cada um com especificação completa):
-- Campos: nome, tipo HTML, validação Zod, mensagem de erro
-- React Hook Form + zodResolver
-- Submit: loading state no botão, toast de sucesso/erro
-- Sem animação Framer Motion em inputs (afeta UX)
-
-RESPONSIVIDADE (cada layout):
-- Mobile-first: especificar breakpoints tailwind (sm/md/lg/xl)
-- Grids: ex: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-- Navigation: mobile = Sheet/Drawer, desktop = Sidebar ou Topbar
-
-ACESSIBILIDADE (WCAG 2.1 AA):
-- Contraste mínimo 4.5:1 para texto
-- Labels associados a inputs (não só placeholder)
-- aria-label em botões icon-only
-- Focus visible em todos os interativos
-- Skip to content link
-
-ESTADOS DE UI (padrão para todos os componentes):
-- Loading: Skeleton com mesma estrutura do conteúdo real (não spinner genérico)
-- Empty: ícone Lucide relevante + título + subtítulo + CTA
-- Error: Alert vermelho com mensagem amigável + retry button
-- Success: toast sonner com ícone verde`
-  },
-
-  "backend": {
-    title: "Backend / API",
+  // ─────────────────────────────────────────────────────────────────────────────
+  // NÍVEL 2 — MÓDULO: AUTENTICAÇÃO (NOVO)
+  // Escopo EXCLUSIVO: fluxo de auth, guards, profiles, roles.
+  // ─────────────────────────────────────────────────────────────────────────────
+  "auth": {
+    title: "Módulo de Autenticação & Autorização",
     platform: "Supabase",
-    instructions: `Gere um prompt COMPLETO de backend com especificação técnica de nível enterprise para todas as Edge Functions e configurações Supabase:
+    instructions: `Gere a especificação COMPLETA do sistema de autenticação e autorização. Escopo EXCLUSIVO deste módulo — não duplicar em outros prompts.
 
-EDGE FUNCTIONS (uma seção completa por função):
-Cada função deve incluir:
-- Nome do arquivo: supabase/functions/[nome]/index.ts
-- Método HTTP e rota de chamada
-- Autenticação: verificar JWT via createClient com header Authorization
-- CORS: corsHeaders completo incluindo todos os x-supabase-client-* headers
-- Input: body JSON com interface TypeScript exata + validação Zod schema
-- Lógica de negócio: passo a passo das operações
-- Integração Supabase: queries específicas (tabela, filtros, campos)
-- Integração AI (se aplicável): callAIWithFallback com system+user prompts
-- Output: tipo de retorno, formato JSON de sucesso
-- Tratamento de erros: 400 (validação), 401 (auth), 429 (rate limit), 500 (interno)
-- Exemplo de Response: { data: {...} } ou { error: "mensagem amigável" }
+## 1. FLUXOS DE AUTENTICAÇÃO
 
-RLS POLICIES (cada tabela com políticas completas):
--- Exemplo de nível esperado:
-CREATE POLICY "users_select_own" ON public.tabela
-  FOR SELECT TO authenticated
-  USING (auth.uid() = user_id);
+Cadastro (email + senha):
+- Campos: nome completo, email, senha (mín. 8 chars, 1 maiúscula, 1 número), confirmar senha
+- Schema Zod completo com mensagens PT-BR
+- Após cadastro: confirmar email (não auto-confirmar em produção)
+- Redirect: /verificar-email com instrução para checar inbox
 
-CREATE POLICY "users_insert_own" ON public.tabela
-  FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = user_id);
+Login:
+- Campos: email + senha
+- Lembrar sessão: checkbox que define persistência (local vs session storage do Supabase)
+- Erro genérico: "E-mail ou senha incorretos" (não distinguir qual está errado)
+- Redirect: returnTo param ou /dashboard padrão
 
--- Especificar para SELECT, INSERT, UPDATE, DELETE separadamente
--- Incluir políticas admin com has_role() quando necessário
+Recuperação de senha:
+- Formulário com email → Supabase envia link de reset
+- Página /nova-senha: campos nova senha + confirmar com validação Zod
+- Link expira em 1h (padrão Supabase)
 
-WEBHOOKS E INTEGRAÇÕES EXTERNAS:
-- Endpoint de webhook: URL do Make.com/Zapier, payload exato
-- Validação do payload antes de enviar
-- Retry logic em caso de falha do webhook externo
-- Idempotência: como evitar duplicações
+Sessão persistente:
+- supabase.auth.onAuthStateChange em AuthProvider (Context)
+- Redirecionar para /login se SIGNED_OUT
+- Token refresh automático pelo Supabase client
 
-AUTENTICAÇÃO E AUTORIZAÇÃO:
-- Trigger handle_new_user: INSERT em profiles com campos do raw_user_meta_data
-- Roles: enum app_role, tabela user_roles, função has_role() SECURITY DEFINER
-- Middleware de sessão: verificar auth.uid() em todas as operações
-- JWT decode: extrair user_id do token para queries
+## 2. ESTRUTURA DE ARQUIVOS
 
-STORAGE (se aplicável):
-- Nome dos buckets, policies de acesso (public/private)
-- Upload via supabase.storage.from(bucket).upload(path, file)
-- URL de acesso: supabase.storage.from(bucket).getPublicUrl(path)
+src/hooks/useAuth.tsx:
+- AuthContext com user, session, signIn, signUp, signOut, loading
+- useAuth() hook para consumir o contexto
+- AuthProvider envolvendo toda a aplicação no App.tsx
 
-CONFIGURAÇÕES (supabase/config.toml):
-- Listar cada função com verify_jwt = false se necessário
-- Email templates customizados se aplicável
+src/components/ProtectedRoute.tsx:
+- Verifica session antes de renderizar children
+- Redireciona para /login com state: { returnTo: location.pathname }
+- Loading state enquanto verifica sessão
 
-VARIÁVEIS DE AMBIENTE DA FUNÇÃO:
-- SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
-- APIs externas: nome da var, de onde obter, formato esperado`
-  },
+src/components/PublicOnlyRoute.tsx:
+- Redireciona autenticados para /dashboard (evitar acessar /login estando logado)
 
-  "database": {
-    title: "Esquema do Banco de Dados",
-    platform: "Supabase",
-    instructions: `Gere o schema SQL COMPLETO e PRODUCTION-READY para este sistema. Nível de detalhe esperado = um DBA sênior revisaria e aprovaria sem alterações:
+## 3. PROFILES (tabela pública do usuário)
 
-SCHEMA COMPLETO (cada tabela com):
-CREATE TABLE public.[tabela] (
-  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  -- todos os campos com: tipo PostgreSQL exato, DEFAULT, NOT NULL/NULL, CHECK constraints
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  updated_at  timestamptz NOT NULL DEFAULT now()
-);
-
-TIPOS DE DADOS CORRETOS:
-- Texto curto (<255): text ou varchar(N) com justificativa
-- Texto longo: text
-- Números inteiros: integer ou bigint
-- Decimais: numeric(precision, scale) — ex: numeric(10,2) para dinheiro
-- Booleanos: boolean NOT NULL DEFAULT false
-- Datas: timestamptz (sempre com fuso) ou date
-- Arrays: text[] ou uuid[]
-- JSON flexível: jsonb (não json)
-- Enums: CREATE TYPE public.nome_enum AS ENUM (...)
-
-ÍNDICES (cada um com justificativa de performance):
-CREATE INDEX idx_[tabela]_[campo] ON public.[tabela]([campo]);
--- Justificativa: "Query X filtra por este campo frequentemente"
--- Incluir índices compostos quando query usa múltiplos campos no WHERE
-
-ROW LEVEL SECURITY (completo para cada tabela):
-ALTER TABLE public.[tabela] ENABLE ROW LEVEL SECURITY;
-
--- Policy SELECT
-CREATE POLICY "[tabela]_select_policy" ON public.[tabela]
-  FOR SELECT TO authenticated USING (auth.uid() = user_id);
-
--- Policy INSERT, UPDATE, DELETE separadamente
--- Políticas especiais para tabelas compartilhadas ou públicas
-
-TRIGGERS ESSENCIAIS:
--- updated_at automático
-CREATE TRIGGER set_updated_at
-  BEFORE UPDATE ON public.[tabela]
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
--- handle_new_user (se profiles existir)
+Trigger handle_new_user() — criar automaticamente ao cadastro:
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  INSERT INTO public.profiles (user_id, ...) VALUES (NEW.id, ...);
+  INSERT INTO public.profiles (user_id, full_name, email)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
+    NEW.email
+  );
   RETURN NEW;
 END;
 $$;
 
-FUNÇÕES DE BANCO (SECURITY DEFINER):
--- Para operações que precisam bypassar RLS:
-CREATE OR REPLACE FUNCTION public.is_owner(_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public AS $$
-  SELECT EXISTS (SELECT 1 FROM [tabela] WHERE id = _id AND user_id = auth.uid())
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+Tabela profiles (campos completos para este projeto):
+- user_id uuid (FK para auth.users, ON DELETE CASCADE)
+- full_name, email, avatar_url
+- plan text DEFAULT 'free'
+- onboarding_completed boolean DEFAULT false
+- created_at, updated_at (com trigger automático)
+RLS: usuário lê/atualiza APENAS seu próprio perfil.
+
+## 4. ROLES E AUTORIZAÇÃO (quando aplicável ao projeto)
+
+Sistema de roles via tabela separada (NUNCA na tabela profiles):
+CREATE TYPE public.app_role AS ENUM ('admin', 'moderator', 'user');
+CREATE TABLE public.user_roles (
+  id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  role    app_role NOT NULL,
+  UNIQUE (user_id, role)
+);
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+
+Função de verificação (SECURITY DEFINER — evita recursão RLS):
+CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role app_role)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = _user_id AND role = _role)
 $$;
 
-RELACIONAMENTOS (diagrama textual):
--- Descrever cada FK com cardinalidade e comportamento ON DELETE
--- Ex: projects (N) → profiles (1): ON DELETE CASCADE
+Guard admin no frontend:
+const { user } = useAuth();
+// verificar role via query Supabase, não localStorage
+const isAdmin = await supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' });
 
-SEEDS / DADOS INICIAIS:
--- INSERT de dados obrigatórios para funcionamento (ex: categorias padrão, planos, roles)
+## 5. PÁGINAS DE AUTH (componentes completos)
 
-CHECKLIST DE INTEGRIDADE:
--- [ ] Todas as tabelas com RLS habilitado
--- [ ] Todas as FKs com ON DELETE definido
--- [ ] Triggers de updated_at em todas as tabelas mutáveis
--- [ ] Índices em todas as FKs e campos de busca frequente`
+/login — LoginPage:
+- Layout: card centralizado, max-w-md, logo acima
+- Form com react-hook-form + zodResolver
+- Link para /cadastro e /recuperar-senha
+- Social login (Google/GitHub) se aplicável ao projeto
+
+/cadastro — CadastroPage:
+- Mesma estrutura de LoginPage
+- Campos: nome, email, senha, confirmar senha
+- Checkbox LGPD (required)
+
+/recuperar-senha — RecuperarSenhaPage
+/nova-senha — NovaSenhaPage (acessada via link do email)
+
+## 6. SEGURANÇA
+- NUNCA armazenar JWT em localStorage
+- Sempre usar HTTPS em produção
+- Rate limiting nativo do Supabase Auth (5 tentativas/hora)
+- Email de confirmação obrigatório antes do primeiro login
+- Senhas: mínimo 8 chars (configurar em Supabase Auth settings)
+
+## 7. CHECKLIST DE AUTH
+- [ ] Cadastro cria profile automaticamente via trigger
+- [ ] Email de confirmação chega em < 2 min
+- [ ] Sessão persiste após refresh da página
+- [ ] /dashboard bloqueia usuário não autenticado
+- [ ] /login redireciona usuário já logado para /dashboard
+- [ ] Recuperação de senha envia email e link funciona
+- [ ] Logout limpa sessão e redireciona para /login
+- [ ] Usuário admin acessa rotas admin, user regular não`,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // NÍVEL 2 — MÓDULO: FRONTEND
+  // Escopo EXCLUSIVO: componentes, páginas, design system em código.
+  // NÃO contém schema SQL nem lógica de Edge Functions.
+  // ─────────────────────────────────────────────────────────────────────────────
+  "frontend": {
+    title: "Módulo Frontend — Componentes & Design System",
+    platform: "Lovable",
+    instructions: `Gere a especificação COMPLETA do frontend React. Escopo EXCLUSIVO: design system em código, componentes de cada página, hooks de UI, responsividade e acessibilidade. Referenciar o Prompt Mestre para contexto de stack.
+
+## 1. DESIGN SYSTEM EM CÓDIGO
+
+Tipografia (implementar em index.css + tailwind.config.ts):
+@import url('https://fonts.googleapis.com/css2?family=[FonteDisplay]:wght@600;700;800&family=[FonteBody]:wght@400;500;600&display=swap');
+
+tailwind.config.ts — fontFamily:
+  display: ['"[FonteDisplay]"', 'sans-serif'],
+  sans:    ['"[FonteBody]"',    'sans-serif'],
+
+Escala tipográfica com classes Tailwind EXATAS (adaptar ao projeto):
+- H1: text-4xl md:text-5xl lg:text-6xl font-display font-bold leading-[1.1] tracking-tight
+- H2: text-2xl md:text-3xl font-display font-semibold leading-tight
+- H3: text-xl font-display font-semibold
+- Body: text-sm font-sans leading-relaxed text-foreground
+- Small: text-xs text-muted-foreground
+- Label: text-2xs font-medium uppercase tracking-wide text-muted-foreground
+
+Componentes shadcn/ui a instalar (lista exata para este projeto):
+[listar apenas os necessários: Button, Card, Dialog, Form, Input, Select, Badge, etc.]
+
+Variantes de Button customizadas (usar CVA):
+- primary: bg-primary text-primary-foreground hover:bg-primary/90
+- secondary: border border-border hover:bg-muted
+- ghost: hover:bg-accent/10 hover:text-accent
+- destructive: bg-destructive text-destructive-foreground
+
+## 2. ESTRUTURA DE COMPONENTES (árvore completa)
+
+src/
+├── components/
+│   ├── ui/              # shadcn/ui customizados
+│   ├── layout/          # AppLayout, Sidebar, Header, Footer
+│   └── [feature]/       # um diretório por módulo do sistema
+├── pages/
+│   └── app/             # uma página por rota autenticada
+├── hooks/               # um hook por recurso (useProjects, useProfile, etc.)
+├── lib/
+│   ├── utils.ts         # cn(), formatters, helpers
+│   └── validations.ts   # todos os schemas Zod exportados
+└── stores/              # Zustand stores (useUIStore, etc.)
+
+## 3. CADA PÁGINA (especificação completa)
+
+Para cada página do sistema, especificar:
+- Nome do arquivo, rota, guard (público/autenticado/admin)
+- Composição: quais componentes formam a página
+- Dados: useQuery keys, tabela Supabase, campos do select, staleTime
+- Loading: Skeleton com estrutura idêntica ao conteúdo real
+- Empty state: ícone + mensagem + CTA específico ao contexto
+- Error: Alert com mensagem + retry button
+- Animações: Framer Motion com initial/animate/transition EXATOS
+
+[Especificar CADA página do sistema com o detalhamento acima]
+
+## 4. FORMULÁRIOS (cada um completo)
+
+Para cada formulário:
+- Schema Zod com mensagens PT-BR (exportar de lib/validations.ts)
+- Campos: tipo HTML, placeholder, mensagem de erro inline
+- Submit: loading state no botão, toast sonner de sucesso/erro
+- Reset do form após submit bem-sucedido
+
+## 5. COMPONENTES COMPARTILHADOS
+
+AppLayout:
+- Sidebar colapsável (desktop: 240px / mobile: Sheet)
+- Topbar: breadcrumb + avatar dropdown + notificações
+- main com scroll independente
+
+Navegação mobile:
+- Sheet com os mesmos itens da Sidebar
+- Trigger: menu burger no topbar
+- Close automatico ao navegar
+
+AppSidebar (itens e ícones Lucide exatos para este projeto)
+
+## 6. RESPONSIVIDADE
+
+Breakpoints testados: 375px, 768px, 1024px, 1440px
+Para cada layout complexo, especificar:
+- Mobile: grid-cols-1, textos reduzidos, elementos colapsados
+- Tablet: grid-cols-2, sidebar como Sheet
+- Desktop: layout completo com sidebar fixa
+
+## 7. ACESSIBILIDADE (WCAG 2.1 AA)
+- Contraste mínimo 4.5:1 para texto normal
+- aria-label em botões icon-only
+- Labels associados a inputs (htmlFor + id)
+- Focus visible em todos os interativos (ring-2 ring-ring ring-offset-2)
+- Skip to content link no topo do AppLayout
+
+## 8. CHECKLIST DE FRONTEND
+- [ ] Todos os componentes respondem em 375px sem overflow horizontal
+- [ ] Skeleton aparece em TODOS os carregamentos (nunca spinner genérico isolado)
+- [ ] Empty state com CTA em todos os módulos de lista
+- [ ] Nenhum hardcode de cor no JSX (verificar grep por "#" em className)
+- [ ] Dark mode funciona sem artefatos visuais
+- [ ] Focus visible em todos os elementos interativos`,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // NÍVEL 2 — MÓDULO: BACKEND
+  // Escopo EXCLUSIVO: Edge Functions, webhooks, RLS policies.
+  // NÃO contém schema SQL completo (fica no módulo Banco).
+  // ─────────────────────────────────────────────────────────────────────────────
+  "backend": {
+    title: "Módulo Backend — Edge Functions & Integrações",
+    platform: "Supabase",
+    instructions: `Gere a especificação COMPLETA das Edge Functions e integrações externas. Escopo EXCLUSIVO: lógica de servidor, validações backend, webhooks e RLS. Schema SQL detalhado fica no módulo Banco.
+
+## 1. EDGE FUNCTIONS (uma seção por função)
+
+Para cada Edge Function do sistema, especificar:
+
+\`\`\`typescript
+// supabase/functions/[nome]/index.ts
+// Método: POST | Rota: supabase.functions.invoke("[nome]", { body })
+
+// Autenticação (padrão para todas as funções):
+const authHeader = req.headers.get("Authorization");
+const { data: { user }, error } = await supabase.auth.getUser(
+  authHeader?.replace("Bearer ", "") ?? ""
+);
+if (!user) return errorResponse(401, "Não autorizado");
+
+// CORS headers obrigatórios em TODAS as respostas (incluindo erros):
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, ...",
+};
+
+// Input: interface TypeScript + validação Zod
+interface RequestBody { ... }
+const schema = z.object({ ... });
+const parsed = schema.safeParse(body);
+if (!parsed.success) return errorResponse(400, parsed.error.message);
+
+// Retorno padrão:
+return new Response(JSON.stringify({ data: result }), {
+  headers: { ...corsHeaders, "Content-Type": "application/json" }
+});
+\`\`\`
+
+[Especificar CADA função do sistema com: nome, input tipado, lógica em passos, output, erros 400/401/429/500]
+
+## 2. RLS POLICIES (cada tabela com politicas completas)
+
+Para cada tabela do sistema:
+ALTER TABLE public.[tabela] ENABLE ROW LEVEL SECURITY;
+
+-- SELECT: usuário vê apenas seus dados
+CREATE POLICY "[tabela]_select_own" ON public.[tabela]
+  FOR SELECT TO authenticated USING (auth.uid() = user_id);
+
+-- INSERT: usuário insere apenas com seu user_id
+CREATE POLICY "[tabela]_insert_own" ON public.[tabela]
+  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+-- UPDATE
+CREATE POLICY "[tabela]_update_own" ON public.[tabela]
+  FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+
+-- DELETE
+CREATE POLICY "[tabela]_delete_own" ON public.[tabela]
+  FOR DELETE TO authenticated USING (auth.uid() = user_id);
+
+-- Políticas admin (se aplicável):
+CREATE POLICY "[tabela]_admin_all" ON public.[tabela]
+  FOR ALL TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+## 3. INTEGRAÇÃO COM IA (via Lovable AI Gateway)
+
+Para cada feature de IA do sistema:
+- Nome da Edge Function, modelo recomendado
+- System prompt (em PT-BR, imperativo, específico ao domínio)
+- User prompt (template com variáveis do projeto)
+- Output esperado: formato JSON ou texto
+- Como exibir no frontend: streaming vs batch, componente de loading
+
+Usar sempre callLovableAI() de _shared/ai-providers.ts.
+Sem hardcode de API keys — apenas LOVABLE_API_KEY do ambiente.
+
+## 4. WEBHOOKS E INTEGRAÇÕES EXTERNAS
+
+Para cada integração externa:
+- Endpoint de recebimento (Edge Function dedicada)
+- Validação de autenticidade do webhook (secret header)
+- Payload esperado com tipos TypeScript
+- Idempotência: verificar se já processou (campo processed_at no banco)
+- Retry logic: responder 200 imediatamente, processar assincronamente
+
+## 5. CONFIGURAÇÕES (supabase/config.toml)
+
+[functions.nome-da-funcao]
+verify_jwt = false  # para funções que validam JWT manualmente
+
+## 6. CHECKLIST DE BACKEND
+- [ ] CORS headers presentes em TODAS as respostas (200, 400, 401, 500)
+- [ ] Todas as funções validam JWT antes de processar
+- [ ] Validação Zod no servidor (nunca confiar apenas no frontend)
+- [ ] Nenhuma função retorna dados de outros usuários
+- [ ] Rate limiting: responder 429 se exceder limite
+- [ ] Variáveis sensíveis apenas em secrets (nunca no código)`,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // NÍVEL 2 — MÓDULO: BANCO DE DADOS
+  // Escopo EXCLUSIVO: schema SQL, índices, triggers, funções de banco.
+  // NÃO contém Edge Functions (fica no módulo Backend).
+  // ─────────────────────────────────────────────────────────────────────────────
+  "database": {
+    title: "Módulo Banco de Dados — Schema SQL Completo",
+    platform: "Supabase",
+    instructions: `Gere o schema SQL COMPLETO e PRODUCTION-READY. Escopo EXCLUSIVO: DDL, índices, RLS, triggers, funções de banco. Edge Functions ficam no módulo Backend.
+
+## 1. SCHEMA COMPLETO
+
+Para cada tabela do sistema:
+CREATE TABLE public.[tabela] (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  -- todos os campos com:
+  --   tipo PostgreSQL exato (text, integer, numeric, boolean, timestamptz, jsonb, text[], uuid[])
+  --   DEFAULT explícito
+  --   NOT NULL ou NULL com justificativa
+  --   CHECK constraint se necessário (ex: CHECK (complexity BETWEEN 1 AND 5))
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+Tipos PostgreSQL corretos (usar o tipo certo):
+- Texto: text (varchar apenas se precisar limite de tamanho)
+- Números: integer, bigint, numeric(10,2) para dinheiro
+- Booleanos: boolean NOT NULL DEFAULT false
+- Datas: timestamptz (SEMPRE com fuso horário)
+- JSON flexível: jsonb (não json)
+- Arrays: text[] ou uuid[]
+- Enums: CREATE TYPE public.nome AS ENUM ('valor1', 'valor2')
+
+## 2. ÍNDICES (com justificativa de performance)
+
+-- Padrão mínimo: índice em toda FK e campo de busca frequente
+CREATE INDEX idx_[tabela]_user_id ON public.[tabela](user_id);
+-- Justificativa: "Todas as queries filtram por user_id — scan completo sem índice"
+
+CREATE INDEX idx_[tabela]_status ON public.[tabela](status);
+-- Justificativa: "Queries de listagem filtram por status frequentemente"
+
+-- Índice composto quando WHERE usa múltiplos campos:
+CREATE INDEX idx_[tabela]_user_status ON public.[tabela](user_id, status);
+
+-- Full-text search (se necessário):
+CREATE INDEX idx_[tabela]_fts ON public.[tabela] USING GIN(to_tsvector('portuguese', title || ' ' || description));
+
+## 3. RLS COMPLETO
+
+ALTER TABLE public.[tabela] ENABLE ROW LEVEL SECURITY;
+
+[Políticas SELECT / INSERT / UPDATE / DELETE para cada tabela]
+[Políticas especiais para tabelas públicas (sem filtro de user_id)]
+[Políticas admin com has_role() para tabelas com acesso privilegiado]
+
+## 4. TRIGGERS ESSENCIAIS
+
+-- updated_at automático (aplicar em todas as tabelas mutáveis)
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN NEW.updated_at = now(); RETURN NEW; END; $$;
+
+CREATE TRIGGER set_[tabela]_updated_at
+  BEFORE UPDATE ON public.[tabela]
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+-- handle_new_user (criar profile automático):
+[SQL completo conforme especificado no módulo Auth]
+
+## 5. FUNÇÕES DE BANCO (SECURITY DEFINER)
+
+-- has_role (anti-recursão RLS):
+[SQL completo conforme módulo Auth]
+
+-- Funções de negócio específicas do projeto:
+CREATE OR REPLACE FUNCTION public.[nome_funcao](_param tipo)
+RETURNS tipo LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  [query]
+$$;
+
+## 6. SEEDS (dados iniciais obrigatórios)
+
+-- Dados necessários para o sistema funcionar (categorias, planos, configurações):
+INSERT INTO public.[tabela] (campo1, campo2) VALUES
+  ('valor1', 'valor2'),
+  ('valor3', 'valor4');
+
+## 7. DIAGRAMA DE RELACIONAMENTOS (textual)
+
+[tabela_a] (N) → [tabela_b] (1): campo_fk ON DELETE [CASCADE/SET NULL/RESTRICT]
+[Listar todos os relacionamentos com cardinalidade e comportamento ON DELETE]
+
+## 8. CHECKLIST DO BANCO
+- [ ] Todas as tabelas com RLS habilitado (ALTER TABLE ... ENABLE ROW LEVEL SECURITY)
+- [ ] Todas as FKs com ON DELETE definido explicitamente
+- [ ] Trigger de updated_at em todas as tabelas com UPDATE
+- [ ] Índice em toda FK e campo de filtro frequente
+- [ ] Enums PostgreSQL para campos com valores fixos (não text livre)
+- [ ] jsonb para campos JSON (nunca json)
+- [ ] Sem dados sensíveis em colunas sem restrição de acesso`,
   },
 
   "dashboard": {
-    title: "Dashboard Analítico",
+    title: "Módulo Dashboard — Painel Analítico",
     platform: "Lovable",
-    instructions: `Gere um prompt completo para dashboard analítico com métricas reais, visualizações e UX de produto maduro:
+    instructions: `Gere um prompt completo para dashboard analítico com métricas reais, visualizações e UX de produto maduro. Referenciar design tokens do Prompt Mestre.
 
 LAYOUT DO DASHBOARD:
 - Sidebar colapsável com navegação principal
@@ -270,283 +571,246 @@ LAYOUT DO DASHBOARD:
 - Tabela de dados recentes com paginação
 
 COMPONENTES DE VISUALIZAÇÃO (Recharts):
-- LineChart para métricas temporais: definir dataKey, color (#HEX específico), dot, tooltip customizado
-- BarChart para comparações: multiple bars com cores do design system
-- PieChart ou DonutChart para distribuições: com legenda customizada
+- LineChart para métricas temporais: dataKey, dot, tooltip customizado com formatação pt-BR
+- BarChart para comparações: multiple bars com cores das CSS vars do design system
+- PieChart para distribuições: legenda customizada
 - ResponsiveContainer em todos os gráficos
-- Tooltip customizado com font-mono para números e formatação em pt-BR
+- Cores dos gráficos: hsl(var(--primary)), hsl(var(--accent)), hsl(var(--muted-foreground))
 
-KPI CARDS (especificar cada um):
-- Título, valor atual (formatado: moeda/percentual/número), variação percentual
-- Cor da variação: verde se positivo, vermelho se negativo
+KPI CARDS (especificar cada um para este projeto):
+- Título, valor atual formatado (moeda/percentual/número pt-BR), variação percentual
+- Cor da variação: text-success se positivo, text-destructive se negativo
 - Ícone Lucide relevante
 - Loading skeleton: mesma estrutura do card preenchido
 
 FILTROS:
 - Seletor de período: Hoje / 7 dias / 30 dias / 90 dias / Personalizado
-- Filtros adicionais por categoria/status: chips multi-select
+- Filtros por categoria/status: chips multi-select
 - Estado dos filtros em Zustand (persistir na URL via searchParams)
-- Contador de resultados filtrados
 
 DADOS E QUERIES:
-- useQuery para cada bloco de dados com staleTime adequado
-- Derivar métricas no cliente com useMemo (não recalcular no servidor)
+- useQuery para cada bloco com staleTime adequado (métricas = 5min, listas = 1min)
+- useMemo para derivar métricas no cliente
 - Refresh automático a cada 5 minutos para métricas live
 
 RESPONSIVIDADE:
 - Mobile: KPIs em grid 2x2, gráficos em coluna única, tabela com scroll horizontal
-- Tablet: KPIs em 2x2, gráficos em 2 colunas
-- Desktop: KPIs em 1x4, layout completo
+- Desktop: KPIs em 1x4, layout completo lado a lado
 
-ESTADOS ESPECIAIS:
-- Loading: Skeleton para cada seção (KPIs, gráficos, tabela)
-- Empty: "Nenhum dado no período selecionado" com ícone BarChart e CTA
-- Error: Alert com retry + timestamp da última atualização bem-sucedida`
+ESTADOS:
+- Loading: Skeleton para cada seção
+- Empty: "Nenhum dado no período" com ícone BarChart e CTA
+- Error: Alert com retry + timestamp da última atualização`,
   },
 
   "mvp": {
-    title: "MVP — Versão Mínima",
+    title: "MVP — Versão Mínima Viável",
     platform: "Lovable",
-    instructions: `Gere um prompt de MVP com escopo RIGIDAMENTE CONTROLADO. O objetivo é o menor produto que valida a hipótese central com menos de 2 semanas de implementação:
+    instructions: `Gere um prompt de MVP com escopo RIGIDAMENTE CONTROLADO. Objetivo: o menor produto que valida a hipótese central em menos de 2 semanas.
 
 PRINCÍPIO DO MVP:
-- Definir claramente a hipótese central que o MVP valida
-- Critério de corte: "se a funcionalidade não ajuda a validar a hipótese, não entra no MVP"
-- Lista explícita de "O que NÃO está no MVP" (funcionalidades futuras)
+- Hipótese central a validar: [definir com base no nicho do projeto]
+- Critério de corte: "se a feature não valida a hipótese, não entra"
+- Lista explícita de "O que NÃO está no MVP" (funcionalidades v2)
 
-FUNCIONALIDADES CORE (mínimo viável):
-- Máximo 3-4 funcionalidades que cobrem o fluxo principal do usuário
-- Cada funcionalidade: nome, descrição em 1 frase, critério de "está pronto"
-- Fluxo do usuário de ponta a ponta: cadastro → ação principal → resultado
+FUNCIONALIDADES CORE (máximo 3-4):
+- Cada feature: nome, descrição em 1 frase, critério de "está pronto"
+- Fluxo end-to-end: cadastro → ação principal → resultado
 
 STACK SIMPLIFICADA (sem over-engineering):
-- React + Vite + Tailwind + shadcn/ui (não customizar — usar defaults)
-- Supabase Auth + 1-3 tabelas no banco (apenas o essencial)
-- Zero Edge Functions no início (usar Supabase client direto quando possível)
-- Sem integrações externas (webhook, CRM, analytics vem depois)
+- React + Vite + Tailwind + shadcn/ui sem customização visual
+- Supabase Auth + máximo 3 tabelas
+- Zero Edge Functions no início (Supabase client direto)
+- Zero integrações externas
 
-BANCO DE DADOS (mínimo):
+BANCO MÍNIMO:
 - Máximo 3-4 tabelas com apenas campos obrigatórios
-- Schema simples, sem triggers complexos, sem enums (usar text com validação no frontend)
-- RLS básica: usuário vê apenas seus próprios dados
+- RLS básica: usuário vê seus dados
+- Sem enums, sem triggers complexos
 
-DESIGN INTENCIALMENTE SIMPLES:
-- Usar componentes shadcn/ui sem customização visual
-- Cores do tema padrão (neutro, profissional)
-- Zero animações Framer Motion (economizar tempo)
-- Layout funcional > layout bonito neste estágio
+DESIGN INTENCIONAL:
+- shadcn/ui sem customização
+- Zero animações Framer Motion
+- Foco: funcional > bonito
 
-CHECKLIST DE LANÇAMENTO DO MVP (itens obrigatórios):
+CHECKLIST DE LANÇAMENTO:
 - [ ] Cadastro e login funcionando
 - [ ] Fluxo principal end-to-end sem erros
-- [ ] Mobile responsivo (375px, 768px)
+- [ ] Mobile responsivo (375px)
 - [ ] Zero console.error em produção
-- [ ] Deploy na Vercel funcionando
 - [ ] URL pública compartilhável
 
-MÉTRICAS DE VALIDAÇÃO (definir antes de construir):
-- Métrica primária: o que vai medir para validar a hipótese?
-- Threshold de sucesso: "se X usuários fizerem Y em Z dias, o MVP foi validado"
-- Como coletar: evento GA4 ou tabela de tracking no banco`
+MÉTRICAS DE VALIDAÇÃO:
+- Métrica primária: o que medir para validar a hipótese
+- Threshold: "X usuários fazem Y em Z dias = validado"`,
   },
 
   "premium": {
-    title: "Versão Premium / Completa",
+    title: "Versão Premium — Funcionalidades Avançadas",
     platform: "Lovable",
-    instructions: `Gere um prompt para a versão COMPLETA e PREMIUM do produto com todas as funcionalidades avançadas, integrações e experiências diferenciadas:
+    instructions: `Gere um prompt para a versão COMPLETA com todas as funcionalidades avançadas, integrações e experiências diferenciadas. Partir do MVP validado.
 
 FUNCIONALIDADES AVANÇADAS (além do MVP):
-- Listar cada funcionalidade premium com: descrição, valor para o usuário, complexidade estimada
-- Diferenciadores competitivos: o que torna esta versão única no mercado
+- Listar cada feature premium com: valor para o usuário, complexidade (1-5)
+- Diferenciadores competitivos únicos no mercado
 
-SISTEMA DE PLANOS E MONETIZAÇÃO:
+SISTEMA DE PLANOS:
 - Definir tiers (Free/Pro/Enterprise ou equivalente)
-- Por tier: funcionalidades disponíveis, limites (storage, uso de IA, projetos)
-- Tabela plan_limits no banco com os limites
+- Por tier: features disponíveis, limites (storage, uso IA, projetos)
+- Tabela plan_limits com os limites
 - Guards de feature: verificar tier antes de ações premium
-- Upgrade flow: modal com comparação de planos + CTA de upgrade
+- Upgrade flow: modal com comparação + CTA de upgrade
 
 INTEGRAÇÕES EXTERNAS AVANÇADAS:
-- Para cada integração: OAuth flow ou API key, dados trocados, frequência de sync
-- Webhooks de entrada e saída com retry logic e idempotência
-- Rate limiting por usuário para chamadas de API externa
+- Para cada integração: OAuth ou API key, dados trocados, frequência de sync
+- Webhooks com retry logic e idempotência
+- Rate limiting por usuário para APIs externas
 
-PERSONALIZAÇÃO E CONFIGURAÇÕES:
-- Perfil completo: avatar upload (Supabase Storage), preferências, notificações
-- Workspace/organização: convidar membros, roles, permissões granulares
-- Tema: light/dark/system via next-themes
+PERSONALIZAÇÃO:
+- Perfil: avatar upload (Supabase Storage), preferências, notificações
+- Workspace/organização: convidar membros, roles
+- Tema: light/dark/system
 
 IA E AUTOMAÇÃO:
-- Descrever cada feature de IA: input, modelo usado, output, como exibir (stream vs batch)
+- Cada feature de IA: input, modelo, output, streaming vs batch
 - Lovable AI Gateway para modelos sem API key extra
-- Cache de resultados de IA no banco para evitar reprocessamento
+- Cache de resultados IA no banco
 
-PERFORMANCE E ESCALA:
-- Paginação cursor-based para listas grandes (não offset)
-- Busca full-text: tsvector + GIN index no PostgreSQL
-- Cache de queries frequentes: TanStack Query staleTime configurado
-- Lazy loading de componentes pesados: React.lazy + Suspense
+PERFORMANCE:
+- Paginação cursor-based para listas grandes
+- Full-text search com tsvector + GIN index
+- React.lazy + Suspense para módulos pesados
 
-OBSERVABILIDADE:
-- Logs estruturados nas Edge Functions (console.log com JSON)
-- Error boundaries em todos os módulos críticos
-- Tracking de eventos GA4 nas ações principais do usuário
-
-CHECKLIST DE PRODUÇÃO (25+ itens):
-- Cada item verificável em ambiente de produção real`
+CHECKLIST DE PRODUÇÃO (25+ itens verificáveis)`,
   },
 
   "correction": {
-    title: "Prompt de Correção de Bugs",
+    title: "Correção de Bugs — Guia de Debugging",
     platform: "Lovable",
-    instructions: `Gere um prompt estruturado e METÓDICO de debugging específico para este tipo de sistema. Nível de detalhe de um engenheiro sênior resolvendo bugs em produção:
+    instructions: `Gere um prompt estruturado de debugging específico para este sistema. Nível de detalhe de engenheiro sênior.
 
 MAPA DE BUGS COMUNS (por categoria):
 
-AUTENTICAÇÃO E SESSÃO:
-- Sessão expira silenciosamente sem redirecionar para login
-- Token JWT inválido não tratado — sistema quebra sem mensagem
-- Refresh token não implementado — usuário deslogado após 1h
-- Verificação: supabase.auth.onAuthStateChange implementado?
+AUTENTICAÇÃO:
+- Sessão expira sem redirecionar → supabase.auth.onAuthStateChange implementado?
+- Token JWT inválido não tratado → crash sem mensagem
+- Verificar: ProtectedRoute checa session ou apenas user?
 
-QUERIES E BANCO DE DADOS:
-- Query sem RLS retorna dados de outros usuários
-- N+1 queries em listas (um fetch por item da lista)
-- Falta de tratamento de erro em .from().select() — data pode ser null
-- Missing await em operações assíncronas
-- Verificação: todas as queries têm .eq("user_id", user.id)?
+QUERIES E BANCO:
+- Query sem RLS → retorna dados de outros usuários
+- N+1 queries em listas → um fetch por item
+- Missing await em async → data é undefined
+- Verificar: todas as queries têm .eq("user_id", user.id)?
 
-FORMULÁRIOS E VALIDAÇÃO:
-- Submit múltiplo — usuário clica 2x e cria duplicata
-- Validação apenas no frontend sem validação no backend (Edge Function)
-- Zod parse sem .safeParse() — throws em vez de retornar erro amigável
-- Limpeza do formulário após submit não implementada
+FORMULÁRIOS:
+- Submit múltiplo → cria duplicatas → usar loading state no botão
+- Zod com .parse() em vez de .safeParse() → throw em vez de erro amigável
+- Form não reseta após submit
 
 ESTADO E RE-RENDERS:
-- useEffect com dependency array incorreto — loop infinito ou dados obsoletos
-- Estado não resetado ao trocar de rota — dados do item anterior aparecem
-- Race condition: dois fetches concorrentes, o mais antigo sobrescreve o mais recente
-- QueryClient não invalidado após mutação — UI desatualizada
+- useEffect com deps incorretas → loop ou dados obsoletos
+- Estado não resetado ao trocar rota → dados do item anterior aparecem
+- QueryClient não invalidado após mutation → UI desatualizada
 
 EDGE FUNCTIONS:
-- CORS headers ausentes em respostas de erro (apenas em 200)
-- Erro não tratado retorna HTML de erro do Deno em vez de JSON
-- Body não lido antes de retornar erro — Response(null) em vez de Response(JSON)
-- Segredo não configurado — função quebra silenciosamente em produção
+- CORS headers ausentes em respostas de erro (apenas no 200)
+- Erro não tratado → HTML de erro Deno em vez de JSON
+- Secret não configurado → função quebra silenciosamente
 
-CHECKLIST DE DEBUGGING (executar em ordem):
-1. [ ] Abrir DevTools → Console → verificar erros JavaScript
-2. [ ] DevTools → Network → verificar chamadas de API (status, payload, response)
-3. [ ] Supabase → Logs → verificar erros nas Edge Functions
-4. [ ] Testar com usuário diferente — bug é do usuário ou do sistema?
-5. [ ] Verificar se bug ocorre em mobile (375px)
-6. [ ] Verificar se bug ocorre em incógnito (sessão limpa)
+CHECKLIST DE DEBUGGING (ordem):
+1. DevTools → Console → verificar erros JS
+2. DevTools → Network → verificar chamadas API (status, payload, response)
+3. Supabase → Logs → erros nas Edge Functions
+4. Testar com usuário diferente → bug é do usuário ou do sistema?
+5. Testar em incógnito (sessão limpa)
+6. Testar em mobile (375px)
 
 FIXES PARA CADA CATEGORIA:
-- Código de correção específico para cada tipo de bug listado acima
-- Padrão defensivo a adotar em novos componentes`
+[Código de correção específico para cada tipo de bug adaptado a este projeto]`,
   },
 
   "refactoring": {
-    title: "Refatoração e Otimização",
+    title: "Refatoração — Arquitetura & Qualidade",
     platform: "Lovable",
-    instructions: `Gere um prompt de refatoração TÉCNICA e ESTRATÉGICA focado em performance, manutenibilidade e arquitetura limpa:
+    instructions: `Gere um prompt de refatoração técnica focado em performance, manutenibilidade e arquitetura limpa.
 
-ANÁLISE DE DEBT TÉCNICO (identificar antes de refatorar):
-- Componentes > 300 linhas: candidatos a split
-- useEffect com múltiplas responsabilidades: separar por concern
-- Props drilling > 3 níveis: candidato a Context ou Zustand
-- Lógica duplicada em múltiplos componentes: extrair para hook/util
+ANÁLISE DE DEBT TÉCNICO:
+- Componentes > 300 linhas → candidatos a split
+- useEffect com múltiplas responsabilidades → separar por concern
+- Props drilling > 3 níveis → Context ou Zustand
+- Lógica duplicada → extrair para hook/util
 
-COMPONENTIZAÇÃO (regras de divisão):
+COMPONENTIZAÇÃO:
 - Single Responsibility: cada componente faz UMA coisa
-- Container vs Presentational: separar lógica de dados da UI
-- Composição via children/slots em vez de props complexas
-- Co-location: arquivos relacionados na mesma pasta
+- Container vs Presentational: separar dados da UI
+- Co-location: arquivos relacionados juntos
 
-CUSTOM HOOKS (extrair para):
-- useAuth: tudo de autenticação (session, user, signIn, signOut)
-- use[Resource]: fetch, loading, error, mutações para cada recurso
-- useLocalStorage: persistência local com TypeScript generics
+CUSTOM HOOKS:
+- useAuth: session, user, signIn, signOut
+- use[Resource]: fetch, loading, error, mutations para cada recurso
 - useDebounce: para inputs de busca
 
-PERFORMANCE (identificar e corrigir):
-- Memoização seletiva: React.memo apenas em componentes com props estáveis e renders frequentes
-- useMemo: cálculos derivados de listas grandes
-- useCallback: handlers passados como props para componentes memoizados
-- TanStack Query staleTime: configurar por tipo de dado (ex: config=5min, feed=30s)
-- Code splitting: React.lazy para páginas e modais pesados
-
 TYPESCRIPT STRICTNESS:
-- Eliminar todos os 'any' — substituir por tipos específicos ou unknown
-- Tipar respostas do Supabase com Database['public']['Tables']['tabela']['Row']
-- Interfaces vs Types: preferir interface para objetos, type para unions
+- Eliminar todos os `any` → tipos específicos ou unknown
+- Tipar responses Supabase: Database['public']['Tables'][tabela]['Row']
 - Zod schemas exportados e reutilizados entre frontend e backend
 
-LIMPEZA DE CÓDIGO:
-- Remover console.log esquecidos
-- Remover imports não utilizados
-- Remover comentários óbvios (/* volta para a home */ — desnecessário)
-- Nomear funções de handler de forma consistente: handleVerbNoun
+PERFORMANCE:
+- React.memo apenas em componentes com props estáveis e renders frequentes
+- useMemo para cálculos derivados de listas grandes
+- TanStack Query staleTime por tipo de dado
+- Code splitting: React.lazy para páginas e modais pesados
 
-ARQUITETURA DE PASTAS (estrutura final esperada):
+ESTRUTURA DE PASTAS:
 src/
-├── components/ui/          # shadcn/ui
-├── components/[feature]/   # componentes de feature
-├── hooks/                  # custom hooks
-├── pages/                  # pages/routes
-├── lib/                    # utils, validations, constants
-├── stores/                 # Zustand stores
-└── types/                  # TypeScript interfaces
+├── components/ui/      # shadcn
+├── components/[feat]/  # por feature
+├── hooks/              # custom hooks
+├── pages/              # routes
+├── lib/                # utils, validations, constants
+├── stores/             # Zustand
+└── types/              # TypeScript interfaces
 
-CHECKLIST DE QUALIDADE (cada item verificável):
-- [ ] Zero warnings no TypeScript strict mode
+CHECKLIST:
+- [ ] Zero warnings TypeScript strict
 - [ ] Zero componentes > 300 linhas
-- [ ] Zero props drilling > 2 níveis
-- [ ] Todos os useEffect com cleanup function quando necessário
-- [ ] Bundle size: analisar com vite-bundle-visualizer`
+- [ ] Zero any no código
+- [ ] Todos os useEffect com cleanup quando necessário
+- [ ] Bundle size analisado`,
   },
 
   "multiplatform": {
     title: "Multiplataforma (Bubble/Bolt)",
     platform: "Bubble",
-    instructions: `Gere um prompt adaptado para plataformas no-code com especificidade operacional que permite implementação direta no Bubble ou Bolt:
+    instructions: `Gere um prompt adaptado para plataformas no-code com especificidade operacional para Bubble ou Bolt.
 
-BUBBLE — ESTRUTURA DO PROJETO:
+BUBBLE — ESTRUTURA:
 
-DATA TYPES (tabelas equivalentes no Bubble):
-- Para cada entidade: nome, campos com tipos Bubble (text/number/date/boolean/list/file/geographic address)
+DATA TYPES:
+- Para cada entidade: nome, campos com tipos Bubble (text/number/date/boolean/list/file)
 - Privacy rules por tipo: condição de visibilidade e modificação
-- Ex: User → Projects: "This Projects's Created By = Current User"
 
-WORKFLOWS (lógica de negócio):
-- Por ação do usuário: trigger (event), condições, steps em ordem
-- Nomenclatura: [Página]-[Ação] (ex: Dashboard-CreateProject)
-- Backend workflows para operações críticas (sem exposição no frontend)
+WORKFLOWS:
+- Por ação: trigger, condições, steps em ordem
+- Nomenclatura: [Página]-[Ação]
+- Backend workflows para operações críticas
 
-PÁGINAS E ELEMENTOS:
-- Listar cada página com: nome, URL, restrição de acesso
-- Grupos e containers principais por página
+PÁGINAS:
+- Nome, URL, restrição de acesso
+- Grupos e containers principais
 - Repeating Groups: data source, filtros, ordenação
-- Input elements: validators, initial content, placeholder
 
-ESTILOS (design system no Bubble):
-- Cores como styles reutilizáveis (Primary #HEX, Secondary #HEX, etc.)
-- Fontes: carregar via Google Fonts no header
-- Styles por tipo de elemento: Button-Primary, Button-Secondary, Card, Input
+ESTILOS:
+- Cores como styles reutilizáveis (Primary, Secondary, etc.)
+- Fonts via Google Fonts no header
 
-PLUGINS NECESSÁRIOS (Bubble marketplace):
-- Listar cada plugin com justificativa de uso
-- Configurações de cada plugin após instalação
-- API Connector: configurar cada endpoint externo
+PLUGINS NECESSÁRIOS:
+- Listar com justificativa de uso
+- API Connector: cada endpoint externo
 
-API CONNECTOR (integrações externas):
-- Endpoint: nome, URL, método, headers, parâmetros, tipo de dado retornado
-- Como mapear resposta para o Data Type do Bubble
-
-BOLT — ESTRUTURA EQUIVALENTE:
-- Components a criar, rotas, stores de estado
-- Equivalências: Bubble Workflow → Bolt action/event handler`
+BOLT — EQUIVALÊNCIAS:
+- Components, rotas, stores
+- Bubble Workflow → Bolt action/event handler`,
   },
 };
 
@@ -555,775 +819,510 @@ BOLT — ESTRUTURA EQUIVALENTE:
 // ─────────────────────────────────────────────────────────────────────────────
 const WEBSITE_PROMPT_TYPES: Record<string, { title: string; platform: string; instructions: string }> = {
 
+  // NÍVEL 1 — Mestre do Site (lean: contexto + stack + rotas + tokens)
   "site_master": {
-    title: "Prompt Mestre do Site",
+    title: "Prompt Mestre do Site — Contexto & Stack",
     platform: "Lovable",
-    instructions: `Crie o prompt mestre COMPLETO para construir o site do zero no Lovable. Nível de detalhe: um desenvolvedor sênior deve conseguir construir o site inteiro a partir deste prompt sem fazer nenhuma pergunta.
+    instructions: `Crie o PROMPT MESTRE do site. Escopo EXCLUSIVO: contexto, stack, mapa de rotas, design tokens e regras. Design system completo fica em site_design. Copywriting fica em site_copy. Deploy fica em site_deploy.
 
-STACK TÉCNICA (especificar versões e justificativas):
-- React 18 + Vite + TypeScript strict
-- Tailwind CSS v3 com CSS Variables para design system (nunca hardcode)
-- shadcn/ui como base de componentes, customizado para o design system
-- Framer Motion (apenas above-the-fold e key interactions, com prefers-reduced-motion)
-- React Router v6 com SSG-like via React + Vite (ou Next.js com renderização por rota se aplicável)
-- TanStack Query v5 para dados assíncronos (CMS, formulários)
-- react-hook-form + Zod para todos os formulários
-- Sonner para toasts
+## 1. CONTEXTO DO SITE
+- O que é o site, qual problema resolve para o visitante
+- Público-alvo: persona principal com comportamento de busca real
+- Diferencial único frente a concorrentes no mesmo nicho
+- Tom de voz: formal/casual, técnico/acessível (com 2-3 exemplos de frase)
+- Objetivo de conversão: o que o visitante deve fazer ao sair do site
 
-DESIGN SYSTEM COMPLETO (valores HEX → HSL reais e específicos):
-implementar em index.css:
+## 2. STACK TÉCNICA (com versões)
+- React 18 + Vite 5 + TypeScript strict
+- Tailwind CSS v3 — NUNCA hardcode de cor
+- shadcn/ui como base, customizado com design system
+- Framer Motion v11 (apenas above-the-fold, prefers-reduced-motion obrigatório)
+- React Router v6 (SPA) OU Next.js 14 App Router (se SSR/ISR necessário)
+- TanStack Query para dados async (formulários, blog, CMS)
+- react-hook-form + Zod para formulários
+
+## 3. DESIGN TOKENS (apenas variáveis — código completo em site_design)
+Definir em index.css:
 :root {
-  --background: [HSL do fundo principal];
-  --foreground: [HSL do texto principal];
-  --primary: [HSL da cor principal da marca];
-  --accent: [HSL da cor de destaque];
-  --muted: [HSL de texto secundário];
-  --border: [HSL de bordas];
-  [demais variáveis...]
+  --background:           [H S% L%];
+  --foreground:           [H S% L%];
+  --primary:              [H S% L%]; /* cor principal da marca */
+  --primary-foreground:   [H S% L%];
+  --accent:               [H S% L%]; /* destaque / CTAs */
+  --accent-foreground:    [H S% L%];
+  --muted:                [H S% L%];
+  --muted-foreground:     [H S% L%];
+  --border:               [H S% L%];
+  --card:                 [H S% L%];
+  --radius: [valor]rem;
 }
+.dark { [variáveis dark] }
+Tipografia: apenas nomear as fontes e pesos (implementação completa em site_design).
 
-Tipografia (Google Fonts, 2 fontes no máximo):
-- Display: "[Fonte Display]" — pesos 600, 700, 800 — para H1, H2, CTAs
-- Body: "[Fonte Body]" — pesos 400, 500, 600 — para parágrafos e UI
+## 4. MAPA DE ROTAS E RENDERING STRATEGY
+Para cada rota:
+- Path, componente, rendering strategy (SSG / ISR revalidate:Ns / SSR / CSR)
+- Justificativa da estratégia escolhida
+- Dados carregados e origem (CMS, Supabase, API)
 
-Escala tipográfica com classes Tailwind exatas:
-- H1: text-5xl md:text-6xl lg:text-7xl font-display font-bold leading-[1.1]
-- H2: text-3xl md:text-4xl font-display font-semibold
-- [H3, Body, Small, etc. completos]
+Exemplo: /blog/[slug] → BlogPost | ISR revalidate:3600 | dados: CMS post by slug
 
-Microinterações (padrão global):
-- Entrada: { opacity: 0, y: 24 } → { opacity: 1, y: 0 }, duration: 0.5s, ease: [0.22, 1, 0.36, 1]
-- Stagger entre cards: delay 0.08s por item
-- Hover em cards: scale(1.01) duration 0.2s
+## 5. HEADLINE + SUBHEADLINE (resumo por seção)
+Para cada seção principal, apenas a headline e subheadline (textos completos vão para site_copy):
+- Hero: "[Headline impactante]" / "[Subheadline de apoio]"
+- Benefícios: "[Título]" / "[Subtítulo]"
+[etc. por seção]
 
-MAPA DO SITE COMPLETO (cada seção com layout detalhado):
-- Descrever cada seção: Hero, Diferenciais, CTA, etc.
-- Por seção: fundo, colunas, conteúdo exato, texto real (não placeholder), CTA, animações
+## 6. REGRAS DE IMPLEMENTAÇÃO
+- Nunca hardcode de cor no JSX (sempre hsl(var(--primary)))
+- prefers-reduced-motion: respeitar em TODAS as animações
+- Landmarks semânticos: header, main, nav, footer, section[aria-label]
+- Alt text descritivo e contextual em todas as imagens
+- Um único H1 por página
 
-FORMULÁRIO DE CONTATO (especificação completa):
-- Campos, validação Zod, submit para API/webhook, estados de loading/success/error
-
-SEO (cada página):
-- title pattern, meta description, Open Graph tags, JSON-LD type por página
-- robots.txt: bloquear /api/**, permitir tudo mais
-- sitemap.xml dinâmico
-
-RESPONSIVIDADE:
-- Breakpoints testados: 375px, 768px, 1024px, 1440px
-- Cada layout de seção nos 4 breakpoints
-
-ACESSIBILIDADE:
-- Contraste mínimo 4.5:1 para texto, 3:1 para texto grande
-- Landmarks semânticos: header, main, nav, footer, section com aria-label
-- Skip to content link
-
-CHECKLIST DE ENTREGA (25+ itens verificáveis):
-- [ ] Lighthouse ≥ 90 em Performance, Acessibilidade, SEO
-- [ ] Formulário enviado chega no destino correto
-- [ ] JSON-LD válido em schema.org/validator
-- [ ] Meta OG pré-visualiza corretamente no WhatsApp
-- [...]`
-  },
-
-  "site_copy": {
-    title: "Copywriting e Textos",
-    platform: "Geral",
-    instructions: `Gere o copywriting COMPLETO e PRONTO PARA USO em todas as seções do site. Nível de qualidade: copy de agência premium, orientado a conversão, adaptado ao nicho específico.
-
-PARA CADA SEÇÃO DO SITE, entregar:
-1. Headline principal (H1/H2): impactante, com benefício específico, máximo 10 palavras
-2. Subheadline: expandir o benefício, 1-2 linhas, sem jargão
-3. Corpo do texto: 2-3 parágrafos que constroem credibilidade + desejo + urgência
-4. CTA Primário: verbo de ação + benefício (ex: "Otimize Minha Presença Digital" > "Saiba Mais")
-5. CTA Secundário: opção menos comprometida (ex: "Ver Casos de Sucesso")
-6. Microcopy: textos de apoio (labels, tooltips, mensagens de erro/sucesso, placeholders)
-
-SEÇÃO HERO:
-- Badge de credibilidade acima do H1 (ex: "Certificado Google · Meta · LinkedIn")
-- H1 que endereça a dor principal do público-alvo específico
-- Proposta de valor única em 1-2 frases (diferente dos concorrentes)
-- Prova social: "Mais de X empresas confiam em nós" ou métrica real
-
-SEÇÕES DE BENEFÍCIOS/DIFERENCIAIS:
-- 3-4 títulos curtos (3-5 palavras) + 1 frase de expansão cada
-- Foco em benefícios, não features (o QUE o cliente ganha, não o que você faz)
-
-DEPOIMENTOS (template para coletar e formatar):
-- Estrutura: problema → solução → resultado mensurável
-- Formato: "[Resultado específico] em [Tempo]. [Como foi trabalhar]. [Nome, Cargo, Empresa]"
-
-SEÇÃO SOBRE/MANIFESTO:
-- Narrativa da fundação: por que a empresa existe (problema que resolvemos)
-- Abordagem diferenciada: como fazemos diferente
-- Tom: humano, direto, sem corporativismo
-
-SEO COPYWRITING (para cada página):
-- Meta title: keyword principal + marca, máximo 60 caracteres
-- Meta description: benefício + CTA implícito, máximo 155 caracteres
-- H1 único por página com keyword principal natural
-- Alt text para imagens: descritivo e contextual, não keyword stuffing
-
-VARIAÇÕES A/B PARA HERO:
-- Versão A: headline focada em dor (o problema do cliente)
-- Versão B: headline focada em transformação (o resultado)
-- Testar: CTA "Falar com Especialista" vs "Ver Como Funciona"
-
-TOM DE VOZ:
-- Definir: formal/casual, técnico/acessível, sério/leve — com base no tom definido
-- Exemplo de vocabulário a usar e a evitar
-- Como tratar objeções comuns nos textos`
-  },
-
-  "site_seo": {
-    title: "Estratégia SEO Completa",
-    platform: "Geral",
-    instructions: `Gere uma estratégia SEO COMPLETA e IMPLEMENTÁVEL, adaptada ao nicho específico do site:
-
-PESQUISA DE KEYWORDS (por página principal):
-Formato de entrega por página:
-- URL: /[slug]
-- Keyword primária: [keyword] — volume estimado, dificuldade
-- Keywords secundárias (3-5): [lista] — uso no H2, H3 e corpo
-- Long-tail (3-5): [lista] — para blog e FAQs
-- Intenção de busca: informacional / transacional / navegacional
-
-META TAGS (cada página, valores específicos):
-<title>: keyword principal + | + nome da marca (máx 60 chars)
-<meta name="description">: benefício + CTA implícito (máx 155 chars)
-<link rel="canonical">: URL canônica completa
-<meta name="robots">: index,follow ou noindex para páginas de admin
-Open Graph (por página):
-  og:title, og:description, og:image (1200x630px), og:url, og:type
-
-JSON-LD STRUCTURED DATA (por tipo de página):
-Home:
-  - Organization: name, url, logo, contactPoint, sameAs (redes sociais)
-  - WebSite: com SearchAction para sitelinks searchbox
-
-Serviços/Produtos:
-  - Service: name, provider, serviceType, areaServed, description
-
-Cases/Portfolio:
-  - WebPage com Review (se depoimento presente)
-  - BreadcrumbList: Home > Cases > [Título]
-
-Blog Post:
-  - BlogPosting: headline, author (Person), datePublished, dateModified, image, wordCount, articleBody
-
-Contato:
-  - ContactPage + LocalBusiness (se local) ou Organization
-
-TECHNICAL SEO CHECKLIST:
+## 7. CHECKLIST DE ENTREGA
+- [ ] Lighthouse ≥ 90 Performance mobile e desktop
 - [ ] Um único H1 por página com keyword principal
-- [ ] H2-H6 hierárquicos e com keywords secundárias naturais
-- [ ] Alt text em todas as imagens (descritivo, com keyword quando natural)
-- [ ] next/image para otimização automática WebP/AVIF
-- [ ] Preload de LCP image (above-the-fold)
-- [ ] Preconnect para Google Fonts e CDNs externos
-- [ ] HTTPS com redirect 301 de HTTP
-- [ ] canonical tag para evitar conteúdo duplicado
-- [ ] Sitemap.xml com todas as URLs incluindo blog posts
-- [ ] robots.txt bloqueando /admin, /api, /_next
-- [ ] Core Web Vitals: LCP < 2.5s, CLS < 0.1, INP < 200ms
-
-ESTRATÉGIA DE CONTEÚDO (3 meses):
-- Mês 1: 4 artigos — [temas específicos ao nicho, baixa dificuldade]
-- Mês 2: 4 artigos — [temas intermediários, busca transacional]
-- Mês 3: 4 artigos + 1 landing page de comparação (ex: "[Empresa] vs Concorrentes")
-- Calendário: por que esses temas, nessa ordem, nesse prazo
-
-LINK BUILDING PARA O NICHO:
-- Diretórios relevantes do setor
-- Sites de review (G2, Capterra, Trustpilot se aplicável)
-- Parceiros para guest posts
-- Oportunidades de PR digital`
+- [ ] Formulário de contato testado (submissão chega no destino)
+- [ ] Meta OG pré-visualiza corretamente no WhatsApp
+- [ ] JSON-LD válido no schema.org/validator
+[20+ itens específicos para este site e nicho]`,
   },
 
+  // NÍVEL 2 — Design System (código CSS completo)
   "site_design": {
-    title: "Design System e Identidade Visual",
+    title: "Design System & Identidade Visual",
     platform: "Figma / Lovable",
-    instructions: `Gere o design system COMPLETO E IMPLEMENTÁVEL para o site, com valores específicos prontos para copiar em código:
+    instructions: `Gere o design system COMPLETO com valores específicos prontos para copiar no código. Escopo EXCLUSIVO: CSS variables, tipografia, componentes visuais, microinterações e grid system. Referenciar design tokens do Prompt Mestre.
 
-CSS VARIABLES (implementar em index.css, valores HSL):
+CSS VARIABLES (index.css, valores HSL reais e específicos):
 :root {
-  /* Cores base */
-  --background:       [H S% L%]; /* ex: 0 0% 100% */
-  --foreground:       [H S% L%]; /* texto principal */
-  --primary:          [H S% L%]; /* cor da marca */
+  --background:       [H S% L%];
+  --foreground:       [H S% L%];
+  --primary:          [H S% L%];
   --primary-foreground: [H S% L%];
   --secondary:        [H S% L%];
-  --secondary-foreground: [H S% L%];
-  --accent:           [H S% L%]; /* destaques e CTAs */
-  --accent-foreground: [H S% L%];
+  --accent:           [H S% L%];
+  --accent-foreground:[H S% L%];
   --muted:            [H S% L%];
   --muted-foreground: [H S% L%];
   --border:           [H S% L%];
-  --input:            [H S% L%];
-  --ring:             [H S% L%];
-  --destructive:      [H S% L%];
   --card:             [H S% L%];
   --card-foreground:  [H S% L%];
+  --destructive:      [H S% L%];
+  --radius:           [valor]rem;
   
-  /* Variáveis extras do site */
-  --color-hero-bg:    [H S% L%]; /* fundo do hero */
+  /* Tokens extras do site */
   --gradient-hero:    linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
   --shadow-card:      0 4px 6px -1px hsl(var(--foreground) / 0.1);
   --shadow-card-hover: 0 10px 25px -5px hsl(var(--primary) / 0.2);
-  --radius:           0.75rem; /* rounded-xl */
 }
+.dark { [todas as variáveis invertidas para dark mode] }
 
-.dark { [versão dark de todas as variáveis] }
-
-TIPOGRAFIA (Google Fonts com import e configuração Tailwind):
+TIPOGRAFIA (Google Fonts + Tailwind):
 @import url('https://fonts.googleapis.com/css2?family=[FonteDisplay]:wght@600;700;800&family=[FonteBody]:wght@400;500;600&display=swap');
 
 tailwind.config.ts:
 fontFamily: {
   display: ['"[FonteDisplay]"', 'sans-serif'],
   sans:    ['"[FonteBody]"', 'sans-serif'],
-  mono:    ['"JetBrains Mono"', 'monospace'],
 }
 
-ESCALA TIPOGRÁFICA (classes Tailwind completas):
-- hero-title:    font-display text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.05] tracking-tight
-- section-title: font-display text-3xl md:text-4xl font-semibold leading-[1.2]
-- card-title:    font-display text-xl md:text-2xl font-semibold
-- body-large:    font-sans text-lg leading-relaxed text-[color:var(--muted-foreground)]
-- body:          font-sans text-base leading-relaxed
-- caption:       font-sans text-sm text-[color:var(--muted-foreground)]
-- metric:        font-mono text-3xl font-semibold text-[color:var(--primary)]
+ESCALA TIPOGRÁFICA (classes Tailwind exatas):
+- H1: text-5xl md:text-6xl lg:text-7xl font-display font-bold leading-[1.05] tracking-tight
+- H2: text-3xl md:text-4xl font-display font-semibold leading-tight
+- H3: text-xl md:text-2xl font-display font-semibold
+- Body lg: text-base md:text-lg font-sans leading-relaxed
+- Body: text-sm font-sans leading-relaxed
+- Small: text-xs text-muted-foreground
+- Caption: text-2xs uppercase tracking-widest font-medium
 
-COMPONENTES CUSTOMIZADOS (Button variants):
-Button primary:   bg-[color:var(--primary)] text-[color:var(--primary-foreground)]
-                  px-6 py-3 rounded-[var(--radius)] font-display font-semibold text-sm
-                  shadow-sm hover:shadow-md hover:brightness-110 transition-all duration-200
+VARIANTES DE COMPONENTES (classes Tailwind exatas):
+Button primary: bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm active:scale-[0.98]
+Button secondary: border border-border text-foreground hover:bg-muted
+Button ghost: text-primary hover:bg-primary/8
+Card: bg-card border border-border rounded-[calc(var(--radius)+4px)] p-6 hover:shadow-[var(--shadow-card-hover)] hover:border-primary/30 transition-all duration-200
 
-Button secondary: bg-transparent border border-[color:var(--border)]
-                  text-[color:var(--foreground)] hover:bg-[color:var(--muted)] transition-all
-
-Button ghost:     text-[color:var(--primary)] hover:bg-[color:var(--accent)]/10 transition-all
-
-Card:             bg-[color:var(--card)] border border-[color:var(--border)]
-                  rounded-[calc(var(--radius)+4px)] p-6
-                  shadow-sm hover:shadow-[var(--shadow-card-hover)]
-                  hover:border-[color:var(--primary)]/30 transition-all duration-200
-
-Badge accent:     bg-[color:var(--primary)]/10 text-[color:var(--primary)]
-                  px-3 py-1 rounded-full text-xs font-semibold font-display
-
-GRID SYSTEM (layouts de cada seção):
-- Hero: 2 colunas assimétricas (60%/40%) ou 1 coluna centralizada
-- Features: grid-cols-1 sm:grid-cols-2 lg:grid-cols-4
-- Cases: grid-cols-1 md:grid-cols-2 lg:grid-cols-3
-- Testimonial: centralizado max-w-3xl
-
-ESPAÇAMENTO:
-- Section padding: py-16 md:py-24 lg:py-32
-- Container: max-w-7xl mx-auto px-4 sm:px-6 lg:px-8
-- Gap entre cards: gap-6 md:gap-8
-
-MICROINTERAÇÕES (Framer Motion, padrão global):
+MICROINTERAÇÕES (Framer Motion, valores exatos):
 const fadeUp = {
   initial: { opacity: 0, y: 24 },
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] }
 };
-const staggerContainer = { animate: { transition: { staggerChildren: 0.08 } } };
-// Hover em card: whileHover={{ scale: 1.01 }} transition={{ duration: 0.2 }}`
+const stagger = { animate: { transition: { staggerChildren: 0.08 } } };
+// Hover card: whileHover={{ scale: 1.01 }} transition={{ duration: 0.2 }}
+// Sempre: if (prefersReducedMotion) skip animations
+
+GRID E ESPAÇAMENTO:
+- Section: py-16 md:py-24 lg:py-32
+- Container: max-w-7xl mx-auto px-4 sm:px-6 lg:px-8
+- Cards grid: grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8`,
   },
 
-  "site_sections": {
-    title: "Código de Cada Seção",
-    platform: "Lovable",
-    instructions: `Gere prompts ULTRA-DETALHADOS para implementar cada seção individualmente, com especificação de layout, código e conteúdo real:
-
-PARA CADA SEÇÃO ESCOLHIDA, entregar:
-
-1. LAYOUT EXATO:
-- Estrutura HTML semântica (section > div.container > ...)
-- Sistema de grid: colunas, gaps, alinhamentos específicos
-- Fundo: cor/gradiente usando CSS variables
-- Padding e margin em todos os breakpoints
-
-2. COMPONENTES INTERNOS:
-- Listar cada elemento filho com: tipo HTML, classes Tailwind exatas, conteúdo real
-- Props necessárias para componentes reutilizáveis
-- Ícones Lucide usados (nome exato do componente)
-- next/image com width, height, alt, priority corretos
-
-3. COMPORTAMENTO RESPONSIVO:
-- Mobile (375px): layout de coluna única, tamanhos de texto reduzidos
-- Tablet (768px): início de grid 2 colunas
-- Desktop (1280px): layout final com todas as colunas
-- Overflow: como listas longas são tratadas em mobile
-
-4. ANIMAÇÕES FRAMER MOTION:
-- scroll-trigger via whileInView com { once: true, margin: "-100px" }
-- initial/animate states exatos com valores
-- Stagger entre items de lista com variantes
-- Reducted motion: import da media query e condicionamento
-
-5. CONTEÚDO PLACEHOLDER REALISTA:
-- Textos do nicho específico (não Lorem Ipsum)
-- Métricas e dados plausíveis para o setor
-- Nomes, cargos, empresas fictícios mas verossímeis para o nicho
-
-6. VARIAÇÃO DE LAYOUT ALTERNATIVO:
-- Descrever uma variação (ex: cards vs lista, centralizado vs assimétrico)
-- Quando usar cada variação
-
-SEÇÕES OBRIGATÓRIAS A COBRIR:
-- Hero com elemento visual dinâmico
-- Seção de features/diferenciais
-- Seção de cases/portfolio com grid filtrável
-- Depoimento/social proof
-- FAQ com acordeão
-- CTA final
-- Footer completo (links, redes sociais, copyright, newsletter)`
-  },
-
-  "site_performance": {
-    title: "Performance e Otimização",
+  // NÍVEL 2 — Copywriting
+  "site_copy": {
+    title: "Copywriting & Textos do Site",
     platform: "Geral",
-    instructions: `Guia TÉCNICO E COMPLETO de performance para atingir Lighthouse 95+ em mobile e desktop:
+    instructions: `Gere o copywriting COMPLETO e PRONTO PARA USO. Escopo EXCLUSIVO: textos reais de cada seção. SEO técnico fica em site_seo.
 
-CORE WEB VITALS (cada métrica com estratégia):
+PARA CADA SEÇÃO, entregar:
+1. Headline (H1/H2): impactante, benefício específico, máx 10 palavras
+2. Subheadline: expandir benefício, 1-2 linhas, sem jargão
+3. Corpo: 2-3 parágrafos com credibilidade + desejo + urgência
+4. CTA Primário: verbo + benefício ("Comece Agora" > "Saiba Mais")
+5. CTA Secundário: opção menos comprometida
+6. Microcopy: labels, tooltips, placeholders, mensagens
 
-LCP (Largest Contentful Paint) — alvo: < 2.5s:
-- Identificar o elemento LCP (normalmente hero image ou H1)
-- next/image com priority={true} para imagens acima da dobra
-- Preload manual: <link rel="preload" as="image" href="/hero.webp">
-- Fontes: <link rel="preconnect" href="https://fonts.googleapis.com">
-- Evitar render-blocking JS: carregar scripts com defer/async
-- Servidor: resposta < 600ms (TTFB)
+SEÇÃO HERO:
+- Badge de credibilidade acima do H1
+- H1 que endereça a dor do público deste nicho
+- Proposta de valor única vs concorrentes
+- Prova social: métrica real ou "X empresas confiam"
 
-CLS (Cumulative Layout Shift) — alvo: < 0.1:
-- Definir width e height em TODAS as imagens (evitar layout shift)
-- Reservar espaço para embeds e anúncios com aspect-ratio
-- Fontes: font-display: swap para evitar FOIT
-- Não inserir conteúdo acima de conteúdo existente (exceto fixed/sticky)
+BENEFÍCIOS/DIFERENCIAIS:
+- 3-4 títulos curtos (3-5 palavras) + expansão de 1 frase cada
+- Foco em benefícios (o que o cliente GANHA), não features
 
-INP (Interaction to Next Paint) — alvo: < 200ms:
-- Não bloquear main thread com JSON.parse de payloads grandes
+DEPOIMENTOS (template para coletar):
+"[Resultado específico] em [Tempo]. [Como foi]. — [Nome, Cargo, Empresa]"
+
+SOBRE/MANIFESTO:
+- Por que a empresa existe (problema que resolve)
+- Abordagem diferenciada vs mercado
+- Tom: humano, direto, sem corporativismo
+
+TOM DE VOZ:
+- Vocabulário a usar e a evitar para este nicho
+- Como tratar objeções comuns nos textos
+
+VARIAÇÕES A/B PARA HERO:
+- Versão A: headline focada na dor
+- Versão B: headline focada na transformação`,
+  },
+
+  // NÍVEL 2 — SEO
+  "site_seo": {
+    title: "Estratégia SEO Técnica",
+    platform: "Geral",
+    instructions: `Gere estratégia SEO COMPLETA e IMPLEMENTÁVEL para este nicho. Escopo EXCLUSIVO: técnico, keywords, structured data. Copywriting dos textos fica em site_copy.
+
+KEYWORDS (por página):
+- URL, keyword primária, keywords secundárias, long-tail, intenção de busca
+
+META TAGS (cada página):
+<title>: keyword + marca (máx 60 chars)
+<meta description>: benefício + CTA implícito (máx 155 chars)
+<link rel="canonical">: URL canônica
+Open Graph: og:title, og:description, og:image (1200x630), og:url, og:type
+
+JSON-LD POR TIPO DE PÁGINA:
+- Home: Organization + WebSite com SearchAction
+- Serviços: Service com areaServed
+- Cases: WebPage + BreadcrumbList
+- Blog: BlogPosting com author Person, datePublished, wordCount
+- Contato: ContactPage + LocalBusiness (se local)
+
+TECHNICAL SEO:
+- Um único H1 por página com keyword principal
+- Alt text descritivo em todas as imagens
+- Preload de LCP image
+- Preconnect para Google Fonts e CDNs
+- Sitemap.xml dinâmico (incluindo blog posts)
+- robots.txt bloqueando /admin, /api
+- Core Web Vitals: LCP < 2.5s, CLS < 0.1, INP < 200ms
+
+ESTRATÉGIA DE CONTEÚDO (3 meses):
+- Mês 1: 4 artigos de baixa dificuldade específicos ao nicho
+- Mês 2: 4 artigos com intenção transacional
+- Mês 3: 4 artigos + 1 landing page de comparação`,
+  },
+
+  // NÍVEL 2 — Seções (código)
+  "site_sections": {
+    title: "Código das Seções do Site",
+    platform: "Lovable",
+    instructions: `Gere prompts DETALHADOS para implementar cada seção individualmente. Referenciar design tokens do Prompt Mestre e design system de site_design.
+
+PARA CADA SEÇÃO:
+1. LAYOUT EXATO: estrutura HTML semântica, grid Tailwind, fundo, padding/margin por breakpoint
+2. COMPONENTES INTERNOS: cada elemento filho com classes Tailwind exatas, conteúdo real do nicho
+3. RESPONSIVIDADE: 375px → 768px → 1280px com cada ajuste especificado
+4. ANIMAÇÕES FRAMER MOTION: whileInView com once:true, initial/animate exatos, stagger
+5. CONTEÚDO REALISTA: textos do nicho (não Lorem Ipsum), métricas plausíveis
+
+SEÇÕES A COBRIR:
+- Hero com elemento visual dinâmico
+- Benefícios/diferenciais (grid de cards)
+- Cases/portfolio com filtros
+- Depoimentos/social proof
+- FAQ com acordeão (Accordion shadcn/ui)
+- CTA final com urgência
+- Footer (links, redes, copyright, newsletter)`,
+  },
+
+  // NÍVEL 2 — Performance
+  "site_performance": {
+    title: "Performance & Core Web Vitals",
+    platform: "Geral",
+    instructions: `Guia técnico para atingir Lighthouse 95+ mobile e desktop.
+
+LCP < 2.5s:
+- Identificar o elemento LCP (hero image ou H1)
+- priority={true} na image LCP
+- Preload: <link rel="preload" as="image">
+- Preconnect para Google Fonts
+
+CLS < 0.1:
+- width e height em todas as imagens
+- font-display: swap para fontes
+- Não inserir conteúdo acima do existente
+
+INP < 200ms:
 - Debounce em inputs de busca (300ms)
-- Carregamento lazy de componentes não críticos
-- Evitar layouts síncronos forçados (ler + escrever DOM no mesmo frame)
+- Lazy loading de componentes não críticos
+- Evitar layouts síncronos forçados
 
 IMAGENS:
-- next/image em TODAS as imagens (WebP/AVIF automático)
-- sizes prop precisa: sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 400px"
-- Blur placeholder: blurDataURL via plaiceholder ou base64 de thumbnail
-- Lazy loading: priority={false} para imagens abaixo da dobra (padrão next/image)
-- Formato de upload: aceitar apenas JPEG/PNG/WebP, recusar BMP/TIFF
-
-FONTES:
-- next/font/google: preload e self-hosting automático
-- Apenas os pesos realmente usados: subset: ["latin"], display: "swap"
-- Variable fonts quando disponível (reduz arquivos)
+- WebP/AVIF para todas as imagens
+- sizes prop preciso por breakpoint
+- Lazy loading abaixo da dobra
 
 JAVASCRIPT:
-- Bundle analysis: vite-bundle-visualizer para identificar dependências pesadas
-- React.lazy + Suspense para componentes > 10KB não críticos
-- Tree-shaking: importar apenas o que usa (ex: import { format } from 'date-fns' não import * as)
-- Evitar: moment.js (usar date-fns), lodash completo (usar lodash-es individual)
-
-CSS:
-- Tailwind purge automático em produção (zero CSS não usado)
-- CSS crítico inlined automaticamente pelo Next.js
-- Evitar CSS-in-JS em componentes de server
-
-CACHING E HEADERS:
-next.config.ts:
-headers: async () => [{
-  source: '/(.*)',
-  headers: [
-    { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-    { key: 'X-Content-Type-Options', value: 'nosniff' },
-    { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  ]
-}]
+- Bundle analysis: vite-bundle-visualizer
+- React.lazy + Suspense para módulos pesados
+- Tree-shaking: importar apenas o necessário
 
 CHECKLIST LIGHTHOUSE:
-- [ ] Performance ≥ 95 mobile e desktop
-- [ ] LCP < 2.5s (real device, slow 4G)
+- [ ] Performance ≥ 95 mobile
+- [ ] LCP < 2.5s em 4G lento
 - [ ] CLS < 0.1
 - [ ] INP < 200ms
-- [ ] FCP < 1.8s
-- [ ] TBT < 200ms
-- [ ] Sem render-blocking resources
-- [ ] Todas as imagens com explicit width/height
-- [ ] Preconnect para domínios de terceiros`
+- [ ] Sem render-blocking resources`,
   },
 
+  // NÍVEL 2 — Formulários
   "site_forms": {
-    title: "Formulários e Integrações",
+    title: "Formulários & Integrações",
     platform: "Lovable",
-    instructions: `Prompt completo para implementar todos os formulários do site com validação, integrações e conformidade LGPD:
+    instructions: `Especificação completa de formulários com validação, integrações e conformidade LGPD.
 
 STACK DE FORMULÁRIOS:
-- react-hook-form + zodResolver (não useState por campo)
-- Zod schemas exportados de lib/validations.ts (reutilizar no backend)
-- Sonner para toasts de feedback
-- Lucide para ícones de estado (CheckCircle, AlertCircle, Loader2)
+- react-hook-form + zodResolver
+- Zod schemas em lib/validations.ts (reutilizar no backend)
+- Sonner para toasts
 
-PARA CADA FORMULÁRIO, especificar:
+PARA CADA FORMULÁRIO:
+1. Schema Zod completo com mensagens PT-BR
+2. Campos: tipo HTML, placeholder realista, mensagem de erro inline
+3. Máscara: WhatsApp (XX) XXXXX-XXXX, CPF, CNPJ
+4. Estados do botão: default / loading / sucesso / erro
+5. Integração: Edge Function + webhook CRM + persistência no banco
+6. Anti-spam: honeypot + rate limiting (máx 3/hora por IP)
 
-1. SCHEMA ZOD (completo, com mensagens em PT-BR):
-const [NomeForm]Schema = z.object({
-  name: z.string().min(3, "Nome deve ter ao menos 3 caracteres"),
-  email: z.string().email("E-mail inválido"),
-  whatsapp: z.string().regex(/^\(\d{2}\) \d{4,5}-\d{4}$/, "WhatsApp inválido"),
-  // ... todos os campos com validações específicas
-});
-
-2. CAMPOS E VALIDAÇÕES (cada campo):
-- Tipo HTML correto: input[type="email"], tel, textarea, select
-- Label com htmlFor vinculado ao id do input
-- Mensagem de erro inline abaixo do campo (text-destructive text-sm)
-- Placeholder: exemplo realista do que preencher
-
-3. MÁSCARA (para telefone/CPF/CNPJ):
-- Usar IMask ou implementação manual sem biblioteca pesada
-- WhatsApp: (XX) XXXXX-XXXX
-- CPF: XXX.XXX.XXX-XX
-- CNPJ: XX.XXX.XXX/XXXX-XX
-
-4. ESTADOS DO BOTÃO:
-- Default: "Enviar" ou CTA específico
-- Loading: <Loader2 className="animate-spin" /> + "Enviando..."
-- Sucesso: <CheckCircle /> + "Enviado!" — disabled por 3s
-- Erro: botão volta ao default + mensagem de erro inline
-
-5. INTEGRAÇÃO (para cada destino):
-Edge Function:
-  - POST /api/[endpoint]
-  - Body: tipar com schema Zod no backend também
-  - Validação server-side obrigatória (nunca confiar só no frontend)
-  - Webhook para CRM: fetch(MAKE_WEBHOOK_URL, { body: JSON.stringify(data) })
-  - Persistir no banco via Supabase
-
-6. ANTI-SPAM:
-- Honeypot: campo hidden name="website" — se preenchido, rejeitar
-- Rate limiting: máx 3 submits por IP por hora (verificar no backend)
-- Recaptcha v3 (score > 0.5) para formulários críticos
-
-LGPD (obrigatório em formulários que coletam dados pessoais):
-- Checkbox de aceite (required): "Li e concordo com a [Política de Privacidade](link)"
-- Texto: "Seus dados serão usados exclusivamente para [finalidade específica]"
-- Armazenar consentimento no banco: user_id/email + timestamp + IP + purpose`
+LGPD (obrigatório para formulários com dados pessoais):
+- Checkbox required: "Li e concordo com a Política de Privacidade"
+- Armazenar consentimento: email + timestamp + IP + purpose`,
   },
 
+  // NÍVEL 2 — E-commerce
   "site_ecommerce": {
-    title: "Loja / E-commerce",
+    title: "Loja / E-commerce Completa",
     platform: "Lovable",
-    instructions: `Prompt completo para loja virtual integrada, desde o catálogo até o checkout e gestão de pedidos:
+    instructions: `Prompt completo para loja virtual desde catálogo até checkout e gestão de pedidos.
 
-BANCO DE DADOS (tabelas específicas de e-commerce):
+BANCO (tabelas específicas):
 CREATE TABLE public.products (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  slug          text UNIQUE NOT NULL,
-  name          text NOT NULL,
-  description   text,
-  price         numeric(10,2) NOT NULL CHECK (price >= 0),
-  compare_price numeric(10,2), -- preço "de" (riscado)
-  stock         integer NOT NULL DEFAULT 0,
-  sku           text UNIQUE,
-  images        text[] NOT NULL DEFAULT '{}',
-  category_id   uuid REFERENCES categories(id),
-  is_active     boolean NOT NULL DEFAULT true,
-  metadata      jsonb DEFAULT '{}', -- variações, atributos extras
-  created_at    timestamptz DEFAULT now()
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug text UNIQUE NOT NULL,
+  name text NOT NULL,
+  description text,
+  price numeric(10,2) NOT NULL CHECK (price >= 0),
+  compare_price numeric(10,2),
+  stock integer NOT NULL DEFAULT 0,
+  sku text UNIQUE,
+  images text[] DEFAULT '{}',
+  category_id uuid REFERENCES categories(id),
+  is_active boolean DEFAULT true,
+  metadata jsonb DEFAULT '{}'
 );
 
 CREATE TABLE public.orders (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id       uuid REFERENCES auth.users(id),
-  email         text NOT NULL, -- para guest checkout
-  status        order_status NOT NULL DEFAULT 'pending',
-  items         jsonb NOT NULL, -- snapshot dos produtos
-  subtotal      numeric(10,2) NOT NULL,
-  discount      numeric(10,2) DEFAULT 0,
-  shipping      numeric(10,2) DEFAULT 0,
-  total         numeric(10,2) NOT NULL,
-  payment_id    text, -- ID do Stripe/MercadoPago
-  shipping_address jsonb,
-  coupon_code   text,
-  created_at    timestamptz DEFAULT now()
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id),
+  email text NOT NULL,
+  status order_status DEFAULT 'pending',
+  items jsonb NOT NULL,
+  subtotal numeric(10,2) NOT NULL,
+  total numeric(10,2) NOT NULL,
+  payment_id text,
+  shipping_address jsonb
 );
 
 CREATE TYPE order_status AS ENUM ('pending','paid','processing','shipped','delivered','cancelled','refunded');
 
-FLUXO DO CHECKOUT (4 etapas):
-1. Carrinho: lista de itens, quantidades, subtotal, campo de cupom
-2. Identificação: login ou guest (nome + email + CPF)
-3. Entrega: endereço com CEP (autocomplete via ViaCEP API), cálculo de frete
+CHECKOUT (4 etapas):
+1. Carrinho: itens, quantidades, subtotal, cupom
+2. Identificação: login ou guest (nome + email)
+3. Entrega: endereço com CEP (ViaCEP autocomplete), cálculo de frete
 4. Pagamento: Stripe Elements ou MercadoPago Checkout Bricks
 
-CARRINHO (persistência):
-- localStorage com JSON.stringify dos items
-- Zustand store: useCartStore com actions (addItem, removeItem, updateQty, clearCart)
-- Sync com banco quando usuário loga (merge de carrinhos)
+CARRINHO (Zustand):
+useCartStore: addItem, removeItem, updateQty, clearCart
+Persistência: localStorage, sync com banco ao logar
 
-GATEWAY DE PAGAMENTO:
-Stripe:
-  - Criar PaymentIntent no backend (Edge Function)
-  - Stripe Elements no frontend (Stripe.js)
-  - Webhook: /api/stripe/webhook para confirmar pagamento (verificar assinatura)
-  
-MercadoPago:
-  - Preference criada no backend
-  - Checkout Pro (redirect) ou Bricks (embedded)
-  - IPN webhook para status do pagamento
+GATEWAY:
+Stripe: PaymentIntent no backend + Elements no frontend + webhook de confirmação
+MercadoPago: Preference no backend + Checkout Pro/Bricks + IPN webhook
 
-GESTÃO DE PEDIDOS (painel admin):
-- Tabela com filtro por status, busca por email/ID
-- Ações: marcar como enviado (input tracking code), cancelar, reembolsar
-- Notificação email por status change (Resend API)
-
-PERFORMANCE:
-- Listagem com filtros server-side (não carregar todos os produtos no cliente)
-- next/image com sizes otimizado para cards de produto
-- Skeleton para listagem e detalhe durante carregamento`
+GESTÃO DE PEDIDOS (admin):
+- Filtro por status, busca por email/ID
+- Ações: marcar enviado, cancelar, reembolsar
+- Notificação email por status (Resend API)`,
   },
 
+  // NÍVEL 2 — CMS/Blog
   "site_cms": {
-    title: "Blog / Sistema de Conteúdo",
+    title: "Blog / Sistema de Conteúdo (CMS)",
     platform: "Lovable",
-    instructions: `Prompt completo para blog integrado com CMS, SEO otimizado e experiência de leitura premium:
+    instructions: `Prompt completo para blog integrado com CMS, SEO otimizado e experiência de leitura premium.
 
-CMS (especificar para o escolhido):
+CMS (especificar conforme projeto):
+Contentful: Space ID + Access Token, Content model BlogPost, funções getPosts/getPostBySlug, ISR revalidate:600
+Notion API: Integration token + Database ID, filtros Published=true, renderizar blocos
+Markdown local: /content/posts/*.mdx, gray-matter para frontmatter, next-mdx-remote
 
-CONTENTFUL:
-- Space ID + Access Token no .env
-- Content models: BlogPost (title, slug, body [Rich Text], excerpt, coverImage, author, category, tags, publishedAt)
-- lib/contentful.ts: funções getPosts(), getPostBySlug(), getCategories()
-- ISR: revalidate: 600 (10min) na função do blog
+LISTAGEM:
+- Grid 3 colunas (1 mobile), ArtigoCard com: capa, categoria, título, excerpt (2 linhas), autor + data + tempo de leitura
+- Filtros: categoria (chips) + busca client-side
+- Paginação: infinite scroll ou numerada
 
-NOTION API:
-- Integration token no .env
-- Database ID da tabela de posts
-- Filtros: Published = true, ordenar por Date
-- Renderizar blocos do Notion em React
-
-MARKDOWN LOCAL:
-- Pasta /content/posts com arquivos .mdx
-- gray-matter para frontmatter (title, date, slug, excerpt, cover, author)
-- next-mdx-remote para render
-- Geração de slugs automática a partir do nome do arquivo
-
-FUNCIONALIDADES DO BLOG:
-Listagem:
-- Grid 3 colunas (1 em mobile)
-- ArtigoCard: capa (next/image), badge de categoria, título, excerpt (2 linhas truncadas), autor + data + tempo de leitura
-- Filtros: por categoria (chips) e busca por título (client-side)
-- Paginação: infinite scroll ou numerada (especificar qual)
-
-Página do artigo:
-- Prose typography: @tailwindcss/typography com customização (font-sans para body, font-display para headings)
-- Tabela de conteúdo automática: extrair H2/H3 com IDs, sidebar sticky em desktop
-- Progress bar de leitura: sticky no topo (2px, accent color)
-- Tempo de leitura: Math.ceil(wordCount / 200) min
-- Compartilhamento: links para Twitter, LinkedIn, WhatsApp, copiar URL
-
-RICH TEXT / MDX CUSTOMIZAÇÕES:
-- H2: text-2xl font-display font-semibold mt-10 mb-4
-- H3: text-xl font-display font-semibold mt-8 mb-3
-- Blockquote: border-l-4 border-primary pl-6 italic text-muted-foreground
-- Code: bg-muted rounded px-1.5 py-0.5 font-mono text-sm
-- Imagens: next/image com caption em italico
-- Links: text-primary underline-offset-4 hover:underline
+PÁGINA DO ARTIGO:
+- @tailwindcss/typography customizado (font-display para headings)
+- Tabela de conteúdo sticky (H2/H3 extraídos)
+- Progress bar de leitura (2px topo)
+- Tempo de leitura: Math.ceil(wordCount/200) min
+- Compartilhamento: Twitter, LinkedIn, WhatsApp
 
 SEO DO BLOG:
-- generateMetadata: title do post, description = excerpt, og:image = capa
-- JSON-LD BlogPosting: headline, author (Person), datePublished, image, wordCount, articleBody (texto limpo)
-- Breadcrumb JSON-LD: Home > Blog > [Título]
-- Sitemap dinâmico incluindo todos os posts
-- RSS feed: /feed.xml com todos os posts
+- generateMetadata: title, description, og:image da capa
+- JSON-LD BlogPosting: headline, author, datePublished, image, wordCount
+- Breadcrumb JSON-LD
+- RSS feed /feed.xml
 
-NEWSLETTER / EMAIL CAPTURE:
+NEWSLETTER:
 - Form inline no final de cada post
-- Edge Function: validar + adicionar à lista (Resend API / Mailchimp)
-- LGPD: checkbox de consentimento obrigatório`
+- Edge Function: validar + Resend/Mailchimp
+- LGPD: checkbox obrigatório`,
   },
 
+  // NÍVEL 2 — Deploy
   "site_deploy": {
-    title: "Deploy e Go-Live",
+    title: "Deploy & Go-Live",
     platform: "Vercel / Netlify",
-    instructions: `Guia COMPLETO de deploy e lançamento, do zero ao site em produção:
+    instructions: `Guia completo de deploy e lançamento do site.
 
-VERCEL (configuração completa):
+VERCEL (configuração):
+vercel.json com: security headers (X-Frame-Options, HSTS, CSP), cache para assets estáticos, redirects de URLs antigas
 
-vercel.json (se necessário):
-{
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
-      ]
-    },
-    {
-      "source": "/_next/static/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
-    }
-  ],
-  "redirects": [
-    { "source": "/home", "destination": "/", "permanent": true },
-    { "source": "/portfolio", "destination": "/cases", "permanent": true }
-  ]
-}
-
-VARIÁVEIS DE AMBIENTE (configurar no painel Vercel):
-Produção + Preview:
-  DATABASE_URL          # Supabase connection string
-  NEXTAUTH_SECRET       # openssl rand -base64 32
-  NEXTAUTH_URL          # https://seu-dominio.com
-  CONTENTFUL_SPACE_ID   # painel.contentful.com > Settings > API Keys
-  CONTENTFUL_ACCESS_TOKEN
-  NEXT_PUBLIC_GA_ID     # Google Analytics 4 Measurement ID
-  NEXT_PUBLIC_GTM_ID    # Google Tag Manager Container ID
-  [todas as demais...]
+Variáveis de ambiente no painel Vercel (produção + preview):
+[Listar todas as vars necessárias com comentário de onde obter]
 
 CI/CD:
-- Branch main → produção automático
-- Branches feat/* e fix/* → preview deployments automáticos
-- Verificação de build antes de merge (GitHub Actions ou Vercel checks)
+- main → produção automático
+- feat/* → preview deployments
+- Build check antes de merge
 
-DOMÍNIO CUSTOMIZADO:
-1. Adicionar domínio em Vercel > Domains
-2. Configurar DNS: CNAME www → cname.vercel-dns.com
-3. Apex domain: A record → 76.76.21.21
-4. SSL automático pela Vercel (Let's Encrypt)
-5. Redirect: www → sem www (ou vice-versa, consistente)
+DOMÍNIO:
+1. Adicionar em Vercel > Domains
+2. DNS: CNAME www → cname.vercel-dns.com
+3. Apex: A record → 76.76.21.21
+4. SSL automático (Let's Encrypt)
 
-MONITORAMENTO PÓS-DEPLOY:
-- Vercel Analytics: ativar no painel (sem código extra)
-- Speed Insights: @vercel/speed-insights package
-- Error monitoring: Sentry (opcional) ou Vercel Log Drains
-- Uptime monitoring: UptimeRobot (free) com alertas email
+MONITORAMENTO:
+- Vercel Analytics + Speed Insights
+- UptimeRobot para uptime (alerta email)
+- Sentry para erros (opcional)
 
-CHECKLIST DE LANÇAMENTO (executar em ordem):
-- [ ] next build localmente sem erros ou warnings
-- [ ] Todas as env vars configuradas em produção
-- [ ] Formulário de contato testado e chegando no destino
-- [ ] Google Analytics verificado (evento pageview aparecendo)
-- [ ] Meta Pixel verificado (Events Manager mostrando PageView)
-- [ ] robots.txt correto (não bloquear páginas públicas)
-- [ ] Sitemap.xml acessível e enviado no Google Search Console
-- [ ] JSON-LD validado em: schema.org/validator
-- [ ] Meta OG testado: metatags.io ou cards-dev.twitter.com
-- [ ] Performance: PageSpeed Insights mobile ≥ 90
-- [ ] Responsividade: testar em 375px, 768px, 1440px
-- [ ] Cross-browser: Chrome, Firefox, Safari, Edge
-- [ ] Formulário com LGPD: checkbox de aceite funcionando
-- [ ] 404 customizado com link para home
-- [ ] Redirect de /home e páginas legado funcionando
-- [ ] SSL: https:// funcionando sem aviso do browser
-- [ ] Backup da env file em local seguro (1Password, Vault, etc.)
-- [ ] Google Search Console: domínio verificado + sitemap enviado`
+CHECKLIST DE LANÇAMENTO:
+- [ ] next build sem erros
+- [ ] Todas as env vars em produção
+- [ ] Formulário testado e chegando no destino
+- [ ] Google Analytics verificado
+- [ ] robots.txt correto (não bloqueia páginas públicas)
+- [ ] Sitemap enviado no Search Console
+- [ ] JSON-LD validado
+- [ ] Meta OG testado
+- [ ] PageSpeed Insights mobile ≥ 90
+- [ ] SSL funcionando
+- [ ] 404 customizado com link para home`,
   },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SYSTEM PROMPTS — elevated to enterprise level
+// SYSTEM PROMPTS
 // ─────────────────────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT_APPS = `Você é um arquiteto de software sênior especialista em criar prompts para ferramentas de IA (Lovable, Bolt, Bubble, Supabase).
-Você escreve prompts de NÍVEL ENTERPRISE: extremamente densos, estruturados, acionáveis e completos — prontos para uma IA construir sistemas profissionais sem fazer nenhuma pergunta.
+const SYSTEM_PROMPT_APPS = `Você é um arquiteto de software sênior especialista em criar prompts técnicos para ferramentas de IA (Lovable, Supabase, Bubble).
 
-PADRÃO DE QUALIDADE ESPERADO (referência: prompt de construção de agência digital v2.0):
-- Rendering strategy por rota: especificar SSG/ISR/SSR com justificativa para cada rota
-- Design system com CSS variables REAIS: valores HSL específicos (ex: --primary: 217 91% 60%)
-- Schema de banco: CREATE TABLE com tipos PostgreSQL exatos, DEFAULT, NOT NULL, FK, RLS policies
-- API Routes com: body tipado, validação Zod, ações em ordem, códigos de resposta 200/400/500
-- Variáveis de ambiente: todas necessárias com comentário de onde obter (ex: "painel do Contentful > API Keys")
-- Checklist verificável: 20+ itens concretos testáveis em produção
+REGRA CRÍTICA DE ESCOPO: cada tipo de prompt tem responsabilidade EXCLUSIVA.
+- Prompt MESTRE: define contexto, stack, design tokens e regras — NÃO contém SQL completo, código de componentes ou copywriting
+- Prompt AUTH: fluxo de autenticação, guards, profiles, roles — NÃO duplicar em outros módulos
+- Prompt FRONTEND: componentes, design system em código, animações — NÃO contém SQL ou Edge Functions
+- Prompt BACKEND: Edge Functions, RLS policies, webhooks — NÃO contém schema SQL detalhado
+- Prompt BANCO: schema SQL, índices, triggers — NÃO contém Edge Functions
+Um desenvolvedor deve poder usar cada prompt de forma INDEPENDENTE, referenciando o Mestre para contexto.
+
+PADRÃO DE QUALIDADE:
+- Valores específicos e reais: CSS variables com HSL exatos, classes Tailwind exatas, tipos TypeScript específicos
+- Código real: SQL com tipos PostgreSQL corretos, Zod schemas em PT-BR, snippets funcionais
+- Checklist verificável: 20+ itens testáveis em produção (não genéricos)
+- Adaptar ao nicho: exemplos, nomes de tabelas, fields e textos do domínio específico
 
 LINGUAGEM: português brasileiro técnico. Imperativo direto ("Implemente...", "Crie...", "Configure...").
-EXEMPLOS: sempre com valores reais do projeto (nicho, funcionalidades, público) — nunca genéricos.
-CÓDIGO: incluir snippets de código reais onde exemplifica conceitos (CREATE TABLE, esquema Zod, CSS variables).
 
-ESTRUTURA OBRIGATÓRIA — use exatamente estas 7 seções:
-
+ESTRUTURA OBRIGATÓRIA — 7 seções numeradas:
 ## 1. CONTEXTO DO PROJETO
-(O que é, para quem, qual problema resolve, diferenciais competitivos específicos)
-
 ## 2. STACK TÉCNICA
-(Tecnologias com versões, estratégia de renderização por rota, justificativas técnicas)
+## 3. [SEÇÃO PRINCIPAL do tipo de prompt — ver instrução específica]
+## 4. [CONTINUAÇÃO]
+## 5. [CONTINUAÇÃO]
+## 6. [CONTINUAÇÃO]
+## 7. CHECKLIST DE ENTREGA (20+ itens)`;
 
-## 3. MÓDULOS E FUNCIONALIDADES
-(Lista detalhada de módulos com sub-features, componentes, hooks, queries)
+const SYSTEM_PROMPT_SITES = `Você é um especialista sênior em criação de sites modernos: design, copywriting, SEO, performance e conversão.
 
-## 4. BANCO DE DADOS
-(Schema SQL completo com tipos, constraints, RLS policies, triggers, índices justificados)
+REGRA CRÍTICA DE ESCOPO: cada tipo de prompt tem responsabilidade EXCLUSIVA.
+- Prompt MESTRE: contexto, stack, mapa de rotas, design tokens — NÃO contém design system completo nem copy
+- Prompt DESIGN: CSS variables, tipografia, componentes visuais — NÃO duplica meta tags ou copywriting
+- Prompt COPY: textos reais de cada seção — NÃO contém meta tags técnicas ou JSON-LD
+- Prompt SEO: técnico, keywords, structured data — NÃO contém copywriting das seções
+- Outros módulos: responsabilidade única descrita no título
+Um desenvolvedor + designer + copywriter devem poder trabalhar em paralelo com prompts independentes.
 
-## 5. REGRAS DE NEGÓCIO CRÍTICAS
-(Validações, fluxos condicionais, guards de auth, rate limiting, tratamento de erros)
+PADRÃO DE QUALIDADE:
+- CSS variables com HSL REAIS e específicos (ex: --primary: 217 91% 60%)
+- Google Fonts com família + pesos específicos
+- Classes Tailwind exatas para cada elemento
+- Copywriting REAL adaptado ao nicho (nunca Lorem Ipsum)
+- Animações com initial/animate/transition EXATOS
 
-## 6. COMPORTAMENTO ESPERADO DA IA
-(Design system com CSS variables reais, padrões de componentes, estados de UI, animações)
+LINGUAGEM: português brasileiro técnico e direto.
 
-## 7. CRITÉRIOS DE ENTREGA
-(Checklist de 20+ itens verificáveis em produção)`;
-
-const SYSTEM_PROMPT_SITES = `Você é um especialista sênior em criação de sites modernos de alto desempenho: design, copywriting, SEO, performance e conversão.
-Você escreve prompts de NÍVEL ENTERPRISE para construir sites completos com Lovable (React + Tailwind + shadcn/ui) — prontos para implementação imediata.
-
-PADRÃO DE QUALIDADE ESPERADO (referência: prompt de construção de agência digital v2.0):
-- Design system com CSS variables REAIS: valores HSL específicos (ex: --primary: 220 90% 56%)
-- Google Fonts com pesos específicos (não "usar uma fonte bonita" — "Plus Jakarta Sans 600/700/800")
-- Escala tipográfica com classes Tailwind EXATAS: "H1: text-5xl md:text-6xl font-display font-bold leading-[1.1]"
-- Copywriting: textos REAIS adaptados ao nicho (não placeholders genéricos)
-- Animações: Framer Motion com initial/animate/transition EXATOS (não "adicionar animação")
-- Rendering strategy por rota: SSG/ISR/SSR com revalidate times e justificativa
-- SEO: meta tags, JSON-LD types, robots.txt, sitemap — tudo especificado
-
-LINGUAGEM: português brasileiro técnico. Imperativo direto. Textos reais do nicho.
-CÓDIGO: incluir snippets CSS variables, classes Tailwind, configuração Framer Motion.
-
-ESTRUTURA OBRIGATÓRIA — use exatamente estas 7 seções:
-
-## 1. CONTEXTO E OBJETIVO DO SITE
-(O que é o site, para quem, objetivo principal, diferencial de mercado, tom de voz)
-
-## 2. STACK E FERRAMENTAS
-(React + Vite + Tailwind + shadcn/ui, versões, integrações, CMS se aplicável)
-
-## 3. ESTRUTURA DE PÁGINAS E SEÇÕES
-(Mapa completo com rendering strategy por rota e descrição de cada seção)
-
-## 4. DESIGN SYSTEM
-(CSS variables com HSL reais, tipografia com Google Fonts + pesos + classes Tailwind, componentes customizados)
-
-## 5. CONTEÚDO E COPYWRITING
-(Textos REAIS de cada seção: H1, subheadline, body, CTAs primário e secundário)
-
-## 6. SEO E PERFORMANCE
-(Meta tags por página, JSON-LD types, Core Web Vitals targets, estratégias específicas)
-
-## 7. CRITÉRIOS DE ENTREGA
-(Checklist de 20+ itens verificáveis em produção — não genéricos)`;
+ESTRUTURA OBRIGATÓRIA — 7 seções numeradas.`;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MANDATORY QUALITY REQUIREMENTS (injected into every userPrompt)
+// QUALITY REQUIREMENTS
 // ─────────────────────────────────────────────────────────────────────────────
 const QUALITY_REQUIREMENTS = `
 REQUISITOS OBRIGATÓRIOS DE QUALIDADE (sem exceção):
-✓ Mínimo 1.500 palavras — seja denso, específico, informativo
-✓ Design system com CSS variables HSL REAIS (ex: --primary: 217 91% 60%) — nunca cores hardcoded
-✓ Schema de banco com SQL COMPLETO (tipos PostgreSQL, constraints, RLS policies)
-✓ Stack técnica com VERSÕES ESPECÍFICAS e rendering strategy por rota (SSG/ISR/SSR)
-✓ API Routes/Edge Functions com: body tipado, validação Zod, ações, respostas 200/400/500
-✓ Checklist de entrega com MÍNIMO 20 ITENS concretos e verificáveis em produção
-✓ Variáveis de ambiente necessárias com comentário de ONDE OBTER cada uma
-✓ Exemplos de dados REALISTAS do nicho (não "Lorem ipsum" ou "exemplo_generico")
-✓ Cada funcionalidade com: nome, descrição, componente React, hook, query Supabase
-✓ Estados obrigatórios em TODOS os módulos: loading (skeleton), empty, error, success
-✗ PROIBIDO: generalidades vagas, placeholders genéricos, "usar uma fonte bonita", "adicionar animação"
-✗ PROIBIDO: omitir campos de schema, omitir políticas RLS, omitir tratamento de erros`;
+✓ Mínimo 1.200 palavras — denso, específico, acionável
+✓ Adaptar TODO o conteúdo ao nicho e contexto do projeto (sem exemplos genéricos)
+✓ CSS variables com valores HSL REAIS (ex: --primary: 217 91% 60%)
+✓ Código real: SQL com tipos PostgreSQL corretos, Zod em PT-BR, classes Tailwind exatas
+✓ Checklist com MÍNIMO 20 itens concretos e verificáveis em produção
+✓ ESCOPO EXCLUSIVO: não duplicar conteúdo de outros módulos
+✗ PROIBIDO: generalidades vagas, "usar uma fonte bonita", "adicionar animação"
+✗ PROIBIDO: repetir conteúdo que pertence a outro módulo (ex: SQL no Frontend, CSS no Backend)
+✗ PROIBIDO: Lorem Ipsum ou placeholders genéricos — usar dados reais do nicho`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -1410,17 +1409,16 @@ Tem formulário: ${websiteMeta.website_has_form ? "Sim" : "Não"}
 **Descrição:** ${project.description ?? "Não fornecida"}
 ${siteContext}
 
-**Instrução específica para este tipo de prompt:**
+**Instrução específica para este módulo:**
 ${typeConfig.instructions}
 
 ${QUALITY_REQUIREMENTS}
 
 Gere o prompt COMPLETO, DETALHADO e PRONTO PARA USO em ${typeConfig.platform}.
-O prompt deve ser escrito diretamente para uma IA que vai construir o sistema/site — como se você fosse o engenheiro sênior passando a especificação completa para o Lovable executar.
-Adapte TODOS os exemplos, tecnologias, textos e dados ao contexto específico deste projeto (nicho: ${project.niche ?? "definir"}, público: ${project.audience ?? "definir"}).
-Comece DIRETAMENTE com "## 1." — sem introduções, sem "Aqui está o prompt:", sem meta-comentários.`;
+Adapte TODOS os exemplos, campos, textos e dados ao nicho específico: ${project.niche ?? "definir"}.
+Este prompt será usado de forma INDEPENDENTE — inclua contexto suficiente para funcionar sem os outros módulos.
+Comece DIRETAMENTE com "## 1." — sem introduções, sem "Aqui está:", sem meta-comentários.`;
 
-    // Increased to 8192 for enterprise-level prompts
     const content = await callAIWithFallback(systemPrompt, userPrompt, 8192, 0.6);
 
     const tokensEstimate = Math.round(content.length / 4);
@@ -1467,7 +1465,7 @@ Comece DIRETAMENTE com "## 1." — sem introduções, sem "Aqui está o prompt:"
         status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Erro interno" }), {
+    return new Response(JSON.stringify({ error: "Erro interno ao gerar prompt" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
