@@ -154,139 +154,38 @@ serve(async (req) => {
     // Determine platform
     const effectivePlatform = platform_type ?? project.platform ?? "Web";
     const isMobile = ["mobile", "ios", "android", "react native", "flutter"].some(k => effectivePlatform.toLowerCase().includes(k));
-    const resolution = isMobile ? "390×844px portrait (iPhone 15 Pro)" : "1440×900px widescreen (MacBook Pro)";
-    const canvasSize = isMobile ? "390×844" : "1440×900";
-    const aspectNote = isMobile ? "PORTRAIT orientation, tall mobile screen" : "LANDSCAPE widescreen desktop, 16:9 ratio";
-
     // Context enrichment
-    const features = (project.features ?? []).slice(0, 8).join(", ") || "core application features";
-    const integrations = (project.integrations ?? []).slice(0, 5).join(", ") || "none";
     const nicheContext = getNicheContext(project.niche ?? "");
     const styleAnchors = getStyleAnchors(`${project.type ?? ""} ${project.niche ?? ""}`, project.niche ?? "");
     const componentHints = getComponentHints(screen_name, isMobile);
     const navHints = getNavHints(isMobile, effectivePlatform);
 
-    // ── ULTRA-REALISTIC HIERARCHICAL PROMPT ──────────────────────────────────────
-    const imagePrompt = `CRITICAL INSTRUCTION: You must generate a PHOTOREALISTIC, HIGH-FIDELITY SCREENSHOT of a real, production-ready software application. This image must look EXACTLY like an actual screenshot captured from a live, deployed software product running on a real device.
+    // ── CONCISE HIGH-IMPACT PROMPT (shorter = better for image models) ────────────
+    const imagePrompt = `Photorealistic UI screenshot of "${screen_name}" screen for "${project.title}", a ${project.type ?? "SaaS"} app in the ${project.niche ?? "tech"} industry.
 
-THIS IS NOT:
-- Not a wireframe
-- Not a sketch or hand-drawn illustration  
-- Not a low-fidelity mockup
-- Not abstract art or concept art
-- Not a flat icon set
+Platform: ${effectivePlatform} — ${isMobile ? "mobile portrait 390×844px" : "desktop widescreen 1440×900px"}.
 
-THIS IS:
-✓ A REAL SCREENSHOT of a fully rendered, pixel-perfect UI
-✓ Every element fully rendered with actual colors, shadows, real typography
-✓ Data populated with realistic, domain-specific content (no Lorem ipsum, no placeholder text)
-✓ Looks exactly like what an end user would see when using the real app
+STYLE: Look exactly like a real production app screenshot (similar to ${styleAnchors}). Dark theme with deep navy/charcoal backgrounds (#0d1117, #161b22), electric blue accents (#4F8EF7), crisp white text, subtle card borders.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PROJECT CONTEXT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Application: "${project.title}"
-Type: ${project.type ?? "SaaS Application"}
-Industry / Niche: ${project.niche ?? "Technology"}
-Target Audience: ${project.audience ?? "Professional users"}
-Platform: ${effectivePlatform} — ${resolution} — ${aspectNote}
-Core Features: ${features}
-Integrations: ${integrations}
-${project.description ? `Description: ${project.description}` : ""}
+SCREEN COMPONENTS: ${componentHints}
 
-DOMAIN-SPECIFIC UI DATA TO INCLUDE:
-${nicheContext}
+NAVIGATION: ${navHints}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SCREEN SPECIFICATION: "${screen_name}"
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${screen_description ? `Detailed description:\n${screen_description}\n` : `This is the ${screen_name} screen for ${project.title}.`}
+DOMAIN DATA: ${nicheContext}
 
-MANDATORY UI COMPONENTS FOR THIS SCREEN:
-${componentHints}
+${screen_description ? `SCREEN DETAILS: ${screen_description.slice(0, 400)}` : ""}
 
-NAVIGATION PATTERN:
-${navHints}
+REQUIREMENTS:
+- Photorealistic, pixel-perfect — looks like an ACTUAL SCREENSHOT from a live app
+- Fill entire canvas, no blank areas, no white padding
+- All text readable, domain-specific data (no Lorem ipsum)
+- Fully rendered buttons, inputs, cards, charts with realistic data
+- ${isMobile ? "iOS status bar at top (9:41, battery, signal)" : "App window chrome with titlebar"}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PIXEL-LEVEL RENDERING REQUIREMENTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CANVAS: Render at exactly ${canvasSize}px — fill the ENTIRE canvas with NO blank areas, NO cropping, NO white padding
+NOT: wireframe, sketch, illustration, cartoon, placeholder boxes, abstract art.`;
 
-COLOR SYSTEM — Dark Professional Theme:
-- Main backgrounds: #0d1117, #0f1117, #161b22, #1c2128 (deep charcoal/navy)
-- Card surfaces: #21262d, #1e2430, #252d3d (slightly lighter cards)
-- Primary accent: #4F8EF7 (electric blue) for CTAs, active states, links
-- Secondary accent: #7B5CF0 (violet/indigo) for highlights, badges, charts
-- Success: #22c55e (green) — Active, Complete, Online status
-- Warning: #f59e0b (amber) — Pending, Review status
-- Destructive: #ef4444 (red) — Error, Delete, Critical alerts
-- Text primary: #e6edf3 (bright white/near-white)
-- Text secondary: #8b949e (muted gray)
-- Borders: #30363d (subtle separators)
 
-TYPOGRAPHY — must be SHARP and READABLE:
-- Page title: 20-24px, weight 700, color #e6edf3
-- Section headers: 14-16px, weight 600
-- Body text: 13-14px, weight 400, color #8b949e
-- Labels and badges: 11-12px, weight 500
-- Font family: clean sans-serif (Inter, SF Pro, or similar)
-- ALL text must be crisp, anti-aliased, and readable — NO blurry text
-
-UI COMPONENT RENDERING STANDARDS:
-- Buttons: rounded corners (6-8px), proper padding, drop shadow, hover states visible
-- Input fields: visible border (#30363d), focus ring in primary color, 8px border radius
-- Cards: subtle border (#30363d), card background (#21262d), box-shadow for depth
-- Icons: crisp, recognizable, 16-20px, aligned to baseline — use real icon shapes
-- Badges/chips: pill shape, proper padding, colored backgrounds with matching text
-- Tables: alternating row backgrounds, sticky header, clear column spacing
-- Charts: colored fills, grid lines, axis labels, legend, tooltips if hovered
-- Avatars: circular, 32-40px, initials or profile photo style
-- Checkboxes/Toggles: fully rendered with active/inactive states
-- Dropdowns: visible with chevron icon
-- Progress bars: colored fill on gray track
-
-SPACING GRID:
-- Consistent 8px grid throughout
-- Sidebar: 240px width (desktop)
-- Card padding: 16-20px
-- Section gaps: 16-24px
-
-${isMobile ? `MOBILE STATUS BAR (top):
-- Show iOS-style status bar: time (9:41) left, signal/wifi/battery icons right
-- Safe area respected — content starts below status bar` : `DESKTOP WINDOW CHROME:
-- Show browser-style top bar OR application chrome
-- Titlebar with app name, window controls (minimize/maximize/close)`}
-
-DATA QUALITY — REALISTIC CONTENT:
-- Use domain-specific placeholder data relevant to ${project.niche ?? "the application domain"}
-- Include realistic names, dates in dd/mm/yyyy format, Brazilian phone numbers if applicable
-- Numbers should look realistic (not round numbers like 1000 or 100%)
-- Status badges should show a mix of states (some active, some pending)
-- Tables should show 4-6 rows of varied data
-- Timestamps: "há 2 horas", "ontem", "12/03/2025"
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STYLE REFERENCE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Visual quality level: ${styleAnchors}
-The image must match the visual fidelity and professionalism of these references exactly.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-NEGATIVE PROMPT — DO NOT INCLUDE:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-NO wireframe lines or sketchy outlines
-NO hand-drawn or brushstroke elements
-NO cartoon or illustration style
-NO abstract shapes or geometric art
-NO grey placeholder boxes
-NO "Lorem ipsum" or placeholder text
-NO empty/blank content areas (fill everything with realistic data)
-NO white or light backgrounds (must be dark theme)
-NO low-resolution or blurry rendering
-NO stock photo collages
-NO 3D perspective distortion (keep it flat-screen realistic)
-NO text that says "placeholder", "image here", "coming soon"`;
+    // Call Lovable AI Gateway
 
     // Call Lovable AI Gateway
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
