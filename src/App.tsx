@@ -66,54 +66,58 @@ const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => (
-  <Routes>
-    {/* ── Rotas públicas ── */}
-    <Route path="/" element={<LandingPage />} />
-    <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
-    <Route path="/cadastro" element={<PublicOnlyRoute><CadastroPage /></PublicOnlyRoute>} />
-    <Route path="/recuperar-senha" element={<RecuperarSenhaPage />} />
+  <Suspense fallback={<PageSkeleton />}>
+    <Routes>
+      {/* ── Rotas públicas ── */}
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+      <Route path="/cadastro" element={<PublicOnlyRoute><CadastroPage /></PublicOnlyRoute>} />
+      <Route path="/recuperar-senha" element={<RecuperarSenhaPage />} />
 
-    {/* ── Rotas do app autenticado ── */}
-    <Route
-      path="/app"
-      element={
-        <ProtectedRoute>
-          <AppLayout />
-        </ProtectedRoute>
-      }
-    >
-      <Route index element={<DashboardPage />} />
-      <Route path="projetos" element={<ProjectsPage />} />
-      <Route path="projetos/novo" element={<NewProjectPage />} />
-      <Route path="projetos/:id" element={<ProjectDetailPage />} />
-      <Route path="templates" element={<TemplatesPage />} />
-      <Route path="prompts" element={<PromptsPage />} />
-      <Route path="exportacoes" element={<ExportsPage />} />
-      <Route path="versoes" element={<VersionsPage />} />
-      <Route path="avaliacoes" element={<EvaluationsPage />} />
-      <Route path="configuracoes" element={<SettingsPage />} />
-      <Route path="planos" element={<PlansPage />} />
-    </Route>
+      {/* ── Rotas do app autenticado ── */}
+      <Route
+        path="/app"
+        element={
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<DashboardPage />} />
+        <Route path="projetos" element={<ProjectsPage />} />
+        <Route path="projetos/novo" element={<NewProjectPage />} />
+        <Route path="projetos/:id" element={<ProjectDetailPage />} />
+        <Route path="templates" element={<TemplatesPage />} />
+        <Route path="prompts" element={<PromptsPage />} />
+        <Route path="exportacoes" element={<ExportsPage />} />
+        <Route path="versoes" element={<VersionsPage />} />
+        <Route path="avaliacoes" element={<EvaluationsPage />} />
+        <Route path="configuracoes" element={<SettingsPage />} />
+        <Route path="planos" element={<PlansPage />} />
+      </Route>
 
-    {/* Onboarding — sem sidebar */}
-    <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
+      {/* Onboarding — sem sidebar */}
+      <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
 
-    <Route path="*" element={<NotFound />} />
-  </Routes>
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  </Suspense>
 );
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
