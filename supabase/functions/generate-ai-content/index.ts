@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { callGemini } from "../_shared/ai-providers.ts";
+import { callLovableAI, callGroq } from "../_shared/ai-providers.ts";
 
 const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
 const corsHeaders = {

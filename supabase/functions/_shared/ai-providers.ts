@@ -3,9 +3,10 @@
  * Utilitários de IA multi-provedor para o Project Forge.
  *
  * Provedores:
- *  - Groq   → chamadas de texto baratas / rápidas (free tier generoso)
- *  - Gemini → fallback e geração de conteúdo longo (free tier Google AI)
- *  - OpenAI → tool calling estruturado (gpt-4o-mini)
+ *  - Lovable AI Gateway → principal (Gemini 2.5 Flash — sem cota gratuita limitada)
+ *  - Groq               → rápido e barato para textos curtos/médios
+ *  - Gemini direto      → legado, mantido para compatibilidade
+ *  - OpenAI             → tool calling estruturado (gpt-4o-mini)
  */
 
 // ── Groq ─────────────────────────────────────────────────────────────────────
