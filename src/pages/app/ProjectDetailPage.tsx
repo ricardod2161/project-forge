@@ -6,7 +6,8 @@ import {
   Monitor, Database, ScrollText, Zap, Download, BarChart3, History,
   Bot, MoreHorizontal, Trash2, Archive, Edit3, Tag, Users, Globe, Puzzle,
   RefreshCw, AlertTriangle, AlertCircle, Lightbulb as LightbulbIcon, TrendingUp, ShieldAlert,
-  Plus, Loader2, FileText, ChevronDown, Maximize2, X,
+  Plus, Loader2, FileText, ChevronDown, Maximize2, X, Share2, ChevronRight,
+  Palette, ShoppingCart, Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -70,6 +71,18 @@ const statusConfig = {
   archived: { label: "Arquivado", classes: "bg-muted text-muted-foreground border-border" },
 };
 
+const complexityLabels: Record<number, string> = {
+  1: "MVP Simples", 2: "Simples", 3: "Intermediário", 4: "Complexo", 5: "Enterprise",
+};
+
+const getScoreClassification = (score: number) => {
+  if (score >= 90) return { label: "Enterprise", color: "text-success" };
+  if (score >= 80) return { label: "Sênior",      color: "text-success" };
+  if (score >= 65) return { label: "Avançado",    color: "text-primary" };
+  if (score >= 40) return { label: "Intermediário", color: "text-warning" };
+  return { label: "Básico", color: "text-destructive" };
+};
+
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -119,13 +132,27 @@ const InfoChip = ({ label }: { label: string }) => (
 // ── Tab: Overview ─────────────────────────────────────────────────────────────
 const OverviewTab = ({ project }: { project: ReturnType<typeof useProjectDetail>["data"] }) => {
   if (!project) return null;
-  const fields = [
+  const projectMeta = (project.metadata as Record<string, unknown>) ?? {};
+  const isWebsite = projectMeta.mode === "website";
+
+  const systemFields = [
     { icon: Tag,    label: "Tipo",          value: project.type     },
     { icon: Layers, label: "Nicho",         value: project.niche    },
     { icon: Globe,  label: "Plataforma",    value: project.platform },
     { icon: Users,  label: "Público-alvo",  value: project.audience },
     { icon: Code2,  label: "Monetização",   value: project.monetization },
   ];
+
+  const websiteFields = [
+    { icon: Tag,           label: "Tipo de site",  value: project.type     },
+    { icon: Layers,        label: "Nicho",          value: project.niche    },
+    { icon: Palette,       label: "Estilo visual",  value: String(projectMeta.website_style ?? "") || null },
+    { icon: FileText,      label: "Tom de voz",     value: String(projectMeta.website_tone ?? "") || null },
+    { icon: Globe,         label: "Plataforma",     value: project.platform },
+  ];
+
+  const fields = isWebsite ? websiteFields : systemFields;
+
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
       className="space-y-6">
@@ -152,9 +179,55 @@ const OverviewTab = ({ project }: { project: ReturnType<typeof useProjectDetail>
               ))}
               <span className="text-xs font-semibold text-foreground ml-1">{project.complexity}/5</span>
             </div>
+            <p className="text-2xs text-muted-foreground mt-1.5 font-medium">
+              {complexityLabels[project.complexity ?? 3] ?? "Intermediário"}
+            </p>
           </div>
         )}
       </div>
+
+      {/* Site-specific: sections */}
+      {isWebsite && Array.isArray(projectMeta.website_sections) && (projectMeta.website_sections as string[]).length > 0 && (
+        <div className="p-5 rounded-xl border border-border bg-card">
+          <h3 className="text-xs font-semibold text-foreground mb-3 flex items-center gap-2">
+            <Layers className="w-3.5 h-3.5 text-primary" />
+            Seções do Site
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {(projectMeta.website_sections as string[]).map(s => (
+              <InfoChip key={s} label={s} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Site-specific: features (ecommerce / blog / form) */}
+      {isWebsite && (
+        (() => {
+          const items = [
+            { label: "E-commerce", value: projectMeta.website_has_ecommerce, icon: ShoppingCart },
+            { label: "Blog / CMS", value: projectMeta.website_has_blog,      icon: FileText     },
+            { label: "Formulário", value: projectMeta.website_has_form,      icon: Mail         },
+          ].filter(item => item.value);
+          if (!items.length) return null;
+          return (
+            <div className="p-5 rounded-xl border border-border bg-card">
+              <h3 className="text-xs font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Zap className="w-3.5 h-3.5 text-primary" />
+                Recursos
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {items.map(({ label, icon: Icon }) => (
+                  <span key={label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium bg-success/10 text-success border border-success/20">
+                    <Icon className="w-3 h-3" />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })()
+      )}
 
       {/* Features */}
       {project.features && project.features.length > 0 && (
@@ -240,9 +313,12 @@ const WEBSITE_PROMPT_TYPES_LIST = [
 ];
 
 const platformBadgeClasses: Record<string, string> = {
-  "Lovable":  "bg-primary/10 text-primary border-primary/20",
-  "Supabase": "bg-success/10 text-success border-success/20",
-  "Bubble":   "bg-accent/10 text-accent border-accent/20",
+  "Lovable":          "bg-primary/10 text-primary border-primary/20",
+  "Supabase":         "bg-success/10 text-success border-success/20",
+  "Bubble":           "bg-accent/10 text-accent border-accent/20",
+  "Geral":            "bg-muted text-muted-foreground border-border",
+  "Figma / Lovable":  "bg-primary/10 text-primary border-primary/20",
+  "Vercel / Netlify": "bg-muted text-muted-foreground border-border",
 };
 
 interface FocusModalProps {
@@ -326,12 +402,10 @@ const PromptsTab = ({ projectId, isWebsite }: { projectId: string; isWebsite: bo
       if (error) throw error;
       if (data?.error) {
         if (data.error.includes("429") || data.error.includes("Limite")) toast.error("Limite de requisições atingido.");
-        else if (data.error.includes("402") || data.error.includes("Créditos")) toast.error("Créditos insuficientes.");
         else toast.error(data.error);
         return;
       }
       toast.success("Prompt gerado e salvo!");
-      // Reset to latest version for this type
       setSelectedVersions(prev => {
         const next = { ...prev };
         delete next[type];
@@ -435,7 +509,10 @@ const PromptsTab = ({ projectId, isWebsite }: { projectId: string; isWebsite: bo
               <div className="text-center max-w-xs">
                 <p className="text-xs font-semibold text-foreground mb-1">{currentTypeMeta.label}</p>
                 <p className="text-2xs text-muted-foreground leading-relaxed">{currentTypeMeta.desc}</p>
-                <span className={cn("inline-flex mt-2 px-2 py-0.5 rounded-full text-2xs font-medium border", platformBadgeClasses[currentTypeMeta.platform])}>
+                <span className={cn(
+                  "inline-flex mt-2 px-2 py-0.5 rounded-full text-2xs font-medium border",
+                  platformBadgeClasses[currentTypeMeta.platform] ?? "bg-muted text-muted-foreground border-border"
+                )}>
                   {currentTypeMeta.platform}
                 </span>
               </div>
@@ -455,7 +532,10 @@ const PromptsTab = ({ projectId, isWebsite }: { projectId: string; isWebsite: bo
               {/* Header */}
               <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-card">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={cn("px-2 py-0.5 rounded-full text-2xs font-semibold border", platformBadgeClasses[currentTypeMeta.platform])}>
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-full text-2xs font-semibold border",
+                    platformBadgeClasses[currentTypeMeta.platform] ?? "bg-muted text-muted-foreground border-border"
+                  )}>
                     {currentTypeMeta.platform}
                   </span>
                   {/* Version selector */}
@@ -592,10 +672,10 @@ const severityConfig = {
 } as const;
 
 const categoryConfig = {
-  lacuna:       { label: "Lacuna",        classes: "bg-accent/10 text-accent border-accent/20" },
+  lacuna:         { label: "Lacuna",         classes: "bg-accent/10 text-accent border-accent/20" },
   inconsistencia: { label: "Inconsistência", classes: "bg-warning/10 text-warning border-warning/20" },
-  melhoria:     { label: "Melhoria",      classes: "bg-primary/10 text-primary border-primary/20" },
-  risco:        { label: "Risco",         classes: "bg-destructive/10 text-destructive border-destructive/20" },
+  melhoria:       { label: "Melhoria",       classes: "bg-primary/10 text-primary border-primary/20" },
+  risco:          { label: "Risco",          classes: "bg-destructive/10 text-destructive border-destructive/20" },
 } as const;
 
 // ── Tab: AI Review ────────────────────────────────────────────────────────────
@@ -615,8 +695,6 @@ const AIReviewTab = ({ projectId }: { projectId: string }) => {
       if (data?.error) {
         if (data.error.includes("Limite") || data.error.includes("429")) {
           toast.error("Limite de requisições atingido. Aguarde alguns minutos e tente novamente.");
-        } else if (data.error.includes("Créditos") || data.error.includes("402")) {
-          toast.error("Créditos insuficientes. Acesse Configurações → Uso para adicionar créditos.");
         } else {
           toast.error(data.error);
         }
@@ -627,8 +705,6 @@ const AIReviewTab = ({ projectId }: { projectId: string }) => {
       const msg = err instanceof Error ? err.message : "Erro ao executar revisão";
       if (msg.includes("rate") || msg.includes("429")) {
         toast.error("Limite de requisições atingido. Aguarde alguns minutos.");
-      } else if (msg.includes("402")) {
-        toast.error("Créditos insuficientes. Acesse Configurações → Uso para adicionar créditos.");
       } else {
         toast.error(`Erro na revisão: ${msg}`);
       }
@@ -651,7 +727,6 @@ const AIReviewTab = ({ projectId }: { projectId: string }) => {
       }
     : null;
 
-  // ── Initial state ─────────────────────────────────────────────────────────
   if (!isLoading && !findings) {
     return (
       <motion.div
@@ -693,7 +768,6 @@ const AIReviewTab = ({ projectId }: { projectId: string }) => {
     );
   }
 
-  // ── Loading state ─────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
@@ -718,7 +792,6 @@ const AIReviewTab = ({ projectId }: { projectId: string }) => {
     );
   }
 
-  // ── Results ───────────────────────────────────────────────────────────────
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-4">
       {/* Summary bar */}
@@ -859,9 +932,19 @@ interface EvalResult {
   top_priorities: string[];
 }
 
-const EvalTab = ({ projectId, currentScore }: { projectId: string; currentScore: number | null }) => {
+const EvalTab = ({
+  projectId,
+  currentScore,
+  cachedResult,
+  onResultCached,
+}: {
+  projectId: string;
+  currentScore: number | null;
+  cachedResult: EvalResult | null;
+  onResultCached: (r: EvalResult) => void;
+}) => {
   const queryClient = useQueryClient();
-  const [result, setResult] = useState<EvalResult | null>(null);
+  const [result, setResult] = useState<EvalResult | null>(cachedResult);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleEvaluate = async () => {
@@ -874,15 +957,15 @@ const EvalTab = ({ projectId, currentScore }: { projectId: string; currentScore:
       if (error) throw error;
       if (data?.error) {
         if (data.error.includes("429") || data.error.includes("Limite")) toast.error("Limite de requisições atingido.");
-        else if (data.error.includes("402") || data.error.includes("Créditos")) toast.error("Créditos insuficientes.");
         else toast.error(data.error);
         return;
       }
       setResult(data.evaluation);
+      onResultCached(data.evaluation);
       queryClient.invalidateQueries({ queryKey: ["project", projectId] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast.success("Avaliação concluída! Score salvo no projeto.");
-    } catch (err) {
+    } catch {
       toast.error("Erro ao avaliar projeto.");
     } finally {
       setIsLoading(false);
@@ -1018,7 +1101,36 @@ const EvalTab = ({ projectId, currentScore }: { projectId: string; currentScore:
 
 // ── Tab: Versions ─────────────────────────────────────────────────────────────
 const VersionsTab = ({ projectId }: { projectId: string }) => {
+  const queryClient = useQueryClient();
   const { data: versions, isLoading } = useProjectVersions(projectId);
+  const [isCreating, setIsCreating] = useState(false);
+  const [note, setNote] = useState("");
+  const [showForm, setShowForm] = useState(false);
+
+  const handleCreateVersion = async () => {
+    setIsCreating(true);
+    try {
+      const nextVersion = (versions?.length ?? 0) + 1;
+      const { error } = await supabase
+        .from("project_versions")
+        .insert({
+          project_id: projectId,
+          version_number: nextVersion,
+          changes_summary: note.trim() || `Versão ${nextVersion} criada manualmente.`,
+          generated_by_ai: false,
+          ai_observations: null,
+        });
+      if (error) throw error;
+      toast.success(`v${nextVersion} criada!`);
+      setNote("");
+      setShowForm(false);
+      queryClient.invalidateQueries({ queryKey: ["versions", projectId] });
+    } catch {
+      toast.error("Erro ao criar versão.");
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   if (isLoading) return (
     <div className="space-y-3">
@@ -1026,35 +1138,88 @@ const VersionsTab = ({ projectId }: { projectId: string }) => {
     </div>
   );
 
-  if (!versions?.length) return (
-    <EmptyTab icon={History} title="Sem versões registradas"
-      sub="As versões do projeto aparecerão aqui conforme você evoluir sua estrutura." />
-  );
-
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-      className="space-y-3">
-      {versions.map((v) => (
-        <div key={v.id} className="p-4 rounded-xl border border-border bg-card flex items-start gap-4">
-          <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-            <span className="text-xs font-bold text-primary">v{v.version_number}</span>
+      className="space-y-4">
+      {/* Header with create button */}
+      <div className="flex items-center justify-between">
+        <span className="text-2xs text-muted-foreground font-medium">
+          {versions?.length ?? 0} versão(ões) registrada(s)
+        </span>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-2xs font-medium border border-border hover:border-primary/40 hover:text-primary transition-all"
+        >
+          <Plus className="w-3 h-3" />
+          Nova versão
+        </button>
+      </div>
+
+      {/* Create form */}
+      {showForm && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-3"
+        >
+          <label className="block text-2xs font-medium text-foreground">
+            Nota desta versão (opcional)
+          </label>
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="Ex: Adicionei novos módulos e refinei o público-alvo"
+            rows={2}
+            className="w-full px-3 py-2 rounded-lg text-xs bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCreateVersion}
+              disabled={isCreating}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50"
+            >
+              {isCreating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+              Criar versão
+            </button>
+            <button
+              onClick={() => setShowForm(false)}
+              className="px-4 py-2 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Cancelar
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              {v.generated_by_ai && (
-                <span className="px-2 py-0.5 rounded-full text-2xs font-medium bg-accent/10 text-accent border border-accent/20">
-                  IA
-                </span>
-              )}
-              <span className="text-2xs text-muted-foreground">
-                {new Date(v.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
-              </span>
+        </motion.div>
+      )}
+
+      {/* Versions list */}
+      {!versions?.length ? (
+        <EmptyTab icon={History} title="Sem versões registradas"
+          sub="As versões do projeto aparecerão aqui conforme você evoluir sua estrutura." />
+      ) : (
+        <div className="space-y-3">
+          {versions.map((v) => (
+            <div key={v.id} className="p-4 rounded-xl border border-border bg-card flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-bold text-primary">v{v.version_number}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  {v.generated_by_ai && (
+                    <span className="px-2 py-0.5 rounded-full text-2xs font-medium bg-accent/10 text-accent border border-accent/20">
+                      IA
+                    </span>
+                  )}
+                  <span className="text-2xs text-muted-foreground">
+                    {new Date(v.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+                  </span>
+                </div>
+                {v.changes_summary && <p className="text-xs text-foreground">{v.changes_summary}</p>}
+                {v.ai_observations && <p className="text-2xs text-muted-foreground mt-1">{v.ai_observations}</p>}
+              </div>
             </div>
-            {v.changes_summary && <p className="text-xs text-foreground">{v.changes_summary}</p>}
-            {v.ai_observations && <p className="text-2xs text-muted-foreground mt-1">{v.ai_observations}</p>}
-          </div>
+          ))}
         </div>
-      ))}
+      )}
     </motion.div>
   );
 };
@@ -1091,8 +1256,6 @@ const AIContentTabWrapper = ({
       if (data?.error) {
         if (data.error.includes("429") || data.error.includes("Limite")) {
           setError("Limite de requisições atingido. Aguarde alguns minutos.");
-        } else if (data.error.includes("402") || data.error.includes("Créditos")) {
-          setError("Créditos insuficientes.");
         } else {
           setError(data.error);
         }
@@ -1127,7 +1290,7 @@ const AIContentTabWrapper = ({
   );
 };
 
-// ── ScreensTabWrapper — aba de Telas com geração de mockups e persistência ────
+// ── ScreensTabWrapper ─────────────────────────────────────────────────────────
 const ScreensTabWrapper = ({
   projectId,
   persistedContent,
@@ -1146,11 +1309,9 @@ const ScreensTabWrapper = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load persisted mockup URLs from project.metadata.mockups
   const initialMockups = (projectMetadata?.mockups ?? {}) as Record<string, string>;
 
   const handleMockupSaved = (screenName: string, url: string) => {
-    // Only persist storage URLs, not base64 (base64 = temp fallback)
     if (url.startsWith("data:")) return;
     const existingMockups = (projectMetadata?.mockups ?? {}) as Record<string, string>;
     onUpdateMetadata({ ...projectMetadata, mockups: { ...existingMockups, [screenName]: url } });
@@ -1167,8 +1328,6 @@ const ScreensTabWrapper = ({
       if (data?.error) {
         if (data.error.includes("429") || data.error.includes("Limite")) {
           setError("Limite de requisições atingido. Aguarde alguns minutos.");
-        } else if (data.error.includes("402") || data.error.includes("Créditos")) {
-          setError("Créditos insuficientes.");
         } else {
           setError(data.error);
         }
@@ -1203,7 +1362,7 @@ const ScreensTabWrapper = ({
   );
 };
 
-// ── PagesTabWrapper — aba de Páginas com geração de mockups para sites ────────
+// ── PagesTabWrapper ───────────────────────────────────────────────────────────
 const PagesTabWrapper = ({
   projectId,
   persistedContent,
@@ -1220,7 +1379,6 @@ const PagesTabWrapper = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load persisted mockup URLs from project.metadata.page_mockups
   const initialMockups = (projectMetadata?.page_mockups ?? {}) as Record<string, string>;
 
   const handleMockupSaved = (pageName: string, url: string) => {
@@ -1240,8 +1398,6 @@ const PagesTabWrapper = ({
       if (data?.error) {
         if (data.error.includes("429") || data.error.includes("Limite")) {
           setError("Limite de requisições atingido. Aguarde alguns minutos.");
-        } else if (data.error.includes("402") || data.error.includes("Créditos")) {
-          setError("Créditos insuficientes.");
         } else {
           setError(data.error);
         }
@@ -1312,23 +1468,48 @@ const generateDocFromProject = (project: Project): string => {
 };
 
 const InlineExportTab = ({ project }: { project: Project }) => {
+  const { data: projectPrompts } = useProjectPrompts(project.id);
   const [copied, setCopied] = useState(false);
+  const [exportMode, setExportMode] = useState<"doc" | "prompts">("doc");
+
   const docContent = generateDocFromProject(project);
-  const fileName = `${project.slug ?? project.title.toLowerCase().replace(/\s+/g, "-")}.md`;
+  const docFileName = `${project.slug ?? project.title.toLowerCase().replace(/\s+/g, "-")}.md`;
+
+  const generatePromptsDoc = (): string => {
+    if (!projectPrompts?.length) return "Nenhum prompt gerado ainda.";
+    const lines: string[] = [
+      `# Prompts — ${project.title}`,
+      `Gerado em ${new Date().toLocaleDateString("pt-BR")} · Arquiteto IA`,
+      "",
+    ];
+    projectPrompts.forEach(p => {
+      lines.push(`${"═".repeat(60)}`);
+      lines.push(`## ${p.title}`);
+      lines.push(`Tipo: ${p.type} · Plataforma: ${p.platform ?? "Geral"} · v${p.version}`);
+      lines.push(`Tokens estimados: ~${p.tokens_estimate ?? "—"}`);
+      lines.push("");
+      lines.push(p.content ?? "(sem conteúdo)");
+      lines.push("");
+    });
+    return lines.join("\n");
+  };
+
+  const exportContent = exportMode === "doc" ? docContent : generatePromptsDoc();
+  const exportFileName = exportMode === "doc" ? docFileName : `${project.slug ?? project.id}-prompts.txt`;
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(docContent);
+    await navigator.clipboard.writeText(exportContent);
     setCopied(true);
-    toast.success("Documentação copiada!");
+    toast.success(exportMode === "doc" ? "Documentação copiada!" : "Prompts copiados!");
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownload = () => {
-    const blob = new Blob([docContent], { type: "text/plain;charset=utf-8" });
+    const blob = new Blob([exportContent], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = fileName;
+    a.download = exportFileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1339,30 +1520,64 @@ const InlineExportTab = ({ project }: { project: Project }) => {
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
       className="space-y-4">
+      {/* Mode toggle */}
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={() => setExportMode("doc")}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-2xs font-medium border transition-all",
+            exportMode === "doc"
+              ? "border-primary bg-primary/10 text-primary"
+              : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
+          )}
+        >
+          <FileText className="w-3 h-3" />
+          Documentação Técnica
+        </button>
+        <button
+          onClick={() => setExportMode("prompts")}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-2xs font-medium border transition-all",
+            exportMode === "prompts"
+              ? "border-primary bg-primary/10 text-primary"
+              : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
+          )}
+        >
+          <Zap className="w-3 h-3" />
+          Todos os Prompts
+          {(projectPrompts?.length ?? 0) > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-primary/15 text-primary">
+              {projectPrompts?.length}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Actions */}
       <div className="flex items-center gap-3 flex-wrap">
         <button onClick={handleCopy}
           className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-border hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-all">
           {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
-          {copied ? "Copiado!" : "Copiar Markdown"}
+          {copied ? "Copiado!" : "Copiar"}
         </button>
         <button onClick={handleDownload}
           className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-all">
           <Download className="w-3.5 h-3.5" />
-          Baixar .md
+          Baixar {exportMode === "doc" ? ".md" : ".txt"}
         </button>
       </div>
+
       {/* Preview */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
           <div className="flex items-center gap-2">
             <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-2xs font-medium text-muted-foreground">{fileName}</span>
+            <span className="text-2xs font-medium text-muted-foreground">{exportFileName}</span>
           </div>
-          <span className="text-2xs text-muted-foreground">{docContent.length} caracteres</span>
+          <span className="text-2xs text-muted-foreground">{exportContent.length} caracteres</span>
         </div>
         <pre className="p-5 text-2xs text-foreground leading-relaxed whitespace-pre-wrap font-mono overflow-auto max-h-[480px]">
-          {docContent}
+          {exportContent}
         </pre>
       </div>
     </motion.div>
@@ -1373,16 +1588,17 @@ const InlineExportTab = ({ project }: { project: Project }) => {
 const ProjectDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabId>("overview");
-  // TABS computed after project loads — use SYSTEM_TABS as fallback for loading skeleton
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
-  // In-memory cache for tab switching (hydrated from project.metadata.ai_content on first load)
   const [aiContentCache, setAiContentCache] = useState<Record<string, string | null>>({});
   const [cacheInitialized, setCacheInitialized] = useState(false);
+  const [evalResultCache, setEvalResultCache] = useState<EvalResult | null>(null);
 
   const { data: project, isLoading, error } = useProjectDetail(id);
+  const { data: prompts } = useProjectPrompts(id ?? "");
   const toggleFavorite = useToggleFavorite();
   const updateProject = useUpdateProject(id);
   const deleteProject = useDeleteProject();
@@ -1399,10 +1615,14 @@ const ProjectDetailPage = () => {
     }
   }, [project, cacheInitialized]);
 
-  // When AI generates content: update in-memory cache AND persist to project.metadata (silently)
+  // Scroll to top on tab change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [activeTab]);
+
+  // When AI generates content: update in-memory cache AND persist to project.metadata
   const handleContentGenerated = useCallback((contentType: string, content: string) => {
     setAiContentCache(prev => ({ ...prev, [contentType]: content }));
-    // Persist to DB: merge into metadata.ai_content
     if (project) {
       const currentMeta = (project.metadata as Record<string, unknown>) ?? {};
       const currentAI = (currentMeta.ai_content ?? {}) as Record<string, string>;
@@ -1433,14 +1653,72 @@ const ProjectDetailPage = () => {
     });
   };
 
+  const handleDuplicate = async () => {
+    if (!project) return;
+    const { data, error: dupError } = await supabase
+      .from("projects")
+      .insert({
+        user_id: project.user_id,
+        title: `${project.title} (Cópia)`,
+        slug: `${project.slug ?? project.id}-copia-${Date.now()}`,
+        original_idea: project.original_idea,
+        type: project.type,
+        niche: project.niche,
+        complexity: project.complexity,
+        platform: project.platform,
+        audience: project.audience,
+        features: project.features,
+        monetization: project.monetization,
+        integrations: project.integrations,
+        metadata: project.metadata,
+        status: "draft",
+      })
+      .select()
+      .single();
+    if (dupError) { toast.error("Erro ao duplicar projeto."); return; }
+    toast.success("Projeto duplicado!");
+    queryClient.invalidateQueries({ queryKey: ["projects"] });
+    navigate(`/app/projetos/${data.id}`);
+  };
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/app/projetos/${project?.id}`;
+    await navigator.clipboard.writeText(url);
+    toast.success("Link copiado!");
+  };
+
   // ── Loading state ─────────────────────────────────────────────────────────
   if (isLoading) return (
-    <div className="space-y-6">
-      <Skeleton className="h-28 w-full rounded-xl" />
-      <div className="flex gap-1 flex-wrap">
+    <div className="space-y-5">
+      {/* Back link skeleton */}
+      <Skeleton className="h-5 w-36 rounded" />
+      {/* Header card skeleton */}
+      <div className="p-6 rounded-xl border border-border bg-card space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 space-y-3">
+            <div className="flex gap-2">
+              {[1,2,3].map(i => <Skeleton key={i} className="h-6 w-20 rounded-full" />)}
+            </div>
+            <Skeleton className="h-7 w-64 rounded" />
+            <Skeleton className="h-4 w-48 rounded" />
+            {/* Progress bar */}
+            <Skeleton className="h-3 w-full rounded-full mt-2" />
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <Skeleton className="h-10 w-10 rounded-lg" />
+            <Skeleton className="h-10 w-10 rounded-lg" />
+          </div>
+        </div>
+      </div>
+      {/* Tabs skeleton */}
+      <div className="flex gap-1 flex-wrap border-b border-border pb-1">
         {SYSTEM_TABS.map(t => <Skeleton key={t.id} className="h-8 w-24 rounded-lg" />)}
       </div>
-      <Skeleton className="h-64 w-full rounded-xl" />
+      {/* Content skeleton */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+      </div>
     </div>
   );
 
@@ -1461,116 +1739,214 @@ const ProjectDetailPage = () => {
   const isWebsite = projectMeta.mode === "website";
   const TABS = isWebsite ? WEBSITE_TABS : SYSTEM_TABS;
 
+  // Compute tab content indicators
+  const tabHasContent: Record<string, boolean> = {
+    overview:       true,
+    idea:           !!project.original_idea,
+    modules:        !!aiContentCache["modules"],
+    screens:        !!aiContentCache["screens"],
+    database:       !!aiContentCache["database"],
+    rules:          !!aiContentCache["rules"],
+    pages:          !!aiContentCache["site_pages"],
+    copy:           !!aiContentCache["site_copy"],
+    seo:            !!aiContentCache["site_seo"],
+    structure:      !!aiContentCache["site_structure"],
+    prompts:        (prompts?.length ?? 0) > 0,
+    eval:           project.quality_score !== null,
+    versions:       true,
+    exports:        true,
+    ai:             false,
+  };
+
+  // Compute project completeness
+  const completionItems = [
+    !!project.original_idea,
+    !!aiContentCache[isWebsite ? "site_pages" : "modules"],
+    !!aiContentCache[isWebsite ? "site_copy" : "screens"],
+    !!aiContentCache[isWebsite ? "site_seo" : "database"],
+    !!aiContentCache[isWebsite ? "site_structure" : "rules"],
+    (prompts?.length ?? 0) > 0,
+  ];
+  const completedSections = completionItems.filter(Boolean).length;
+  const totalSections = completionItems.length;
+  const completionPercent = Math.round((completedSections / totalSections) * 100);
+
+  const scoreClassification = project.quality_score !== null
+    ? getScoreClassification(project.quality_score)
+    : null;
+
   return (
     <>
       <div className="space-y-5">
-        {/* ── Back link ── */}
-        <button onClick={() => navigate("/app/projetos")}
-          className="flex items-center gap-1.5 text-2xs text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Todos os projetos
-        </button>
+        {/* ── Breadcrumb ── */}
+        <nav className="flex items-center gap-1.5 text-2xs text-muted-foreground" aria-label="Breadcrumb">
+          <button
+            onClick={() => navigate("/app/projetos")}
+            className="flex items-center gap-1 hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="w-3 h-3" />
+            Meus Projetos
+          </button>
+          <ChevronRight className="w-3 h-3 flex-shrink-0" />
+          <span className="text-foreground font-medium truncate max-w-[200px]">{project.title}</span>
+        </nav>
 
         {/* ── Header card ── */}
         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-          className="p-6 rounded-xl border border-border bg-card">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              {/* Status + badges */}
-              <div className="flex items-center gap-2 flex-wrap mb-3">
-                <span className={cn("px-2.5 py-1 rounded-full text-2xs font-semibold border", statusInfo.classes)}>
-                  {statusInfo.label}
-                </span>
-                {isWebsite && (
-                  <span className="px-2.5 py-1 rounded-full text-2xs font-semibold bg-primary/10 text-primary border border-primary/25 flex items-center gap-1">
-                    <Globe className="w-2.5 h-2.5" />
-                    Site
+          className="rounded-xl border border-border bg-card overflow-hidden relative">
+
+          {/* Score-based gradient line at top */}
+          {project.quality_score !== null && (
+            <div
+              className="h-0.5 w-full absolute top-0 left-0 right-0"
+              style={{
+                background: project.quality_score >= 80
+                  ? "linear-gradient(90deg, hsl(var(--success)), hsl(var(--primary)))"
+                  : project.quality_score >= 60
+                    ? "linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)))"
+                    : project.quality_score >= 40
+                      ? "linear-gradient(90deg, hsl(var(--warning)), hsl(var(--primary)))"
+                      : "linear-gradient(90deg, hsl(var(--destructive)), hsl(var(--warning)))",
+                width: `${project.quality_score}%`,
+              }}
+            />
+          )}
+
+          <div className="p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                {/* Status + badges */}
+                <div className="flex items-center gap-2 flex-wrap mb-3">
+                  <span className={cn("px-2.5 py-1 rounded-full text-2xs font-semibold border", statusInfo.classes)}>
+                    {statusInfo.label}
                   </span>
+                  {isWebsite && (
+                    <span className="px-2.5 py-1 rounded-full text-2xs font-semibold bg-primary/10 text-primary border border-primary/25 flex items-center gap-1">
+                      <Globe className="w-2.5 h-2.5" />
+                      Site
+                    </span>
+                  )}
+                  {project.niche && (
+                    <span className="px-2.5 py-1 rounded-full text-2xs font-medium bg-accent/10 text-accent border border-accent/20">
+                      {project.niche}
+                    </span>
+                  )}
+                  {project.type && (
+                    <span className="px-2.5 py-1 rounded-full text-2xs font-medium bg-muted text-muted-foreground border border-border">
+                      {project.type}
+                    </span>
+                  )}
+                </div>
+
+                {/* Title */}
+                {editingTitle ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      value={titleDraft}
+                      onChange={e => setTitleDraft(e.target.value)}
+                      onBlur={handleTitleSave}
+                      onKeyDown={e => { if (e.key === "Enter") handleTitleSave(); if (e.key === "Escape") setEditingTitle(false); }}
+                      className="font-display font-bold text-xl text-foreground bg-transparent border-b-2 border-primary outline-none w-full"
+                    />
+                  </div>
+                ) : (
+                  <h1
+                    title="Clique para editar"
+                    className="font-display font-bold text-xl text-foreground cursor-pointer hover:text-primary transition-colors flex items-center gap-2 group"
+                    onClick={() => { setTitleDraft(project.title); setEditingTitle(true); }}
+                  >
+                    {project.title}
+                    <Edit3 className="w-3.5 h-3.5 opacity-0 group-hover:opacity-50 transition-opacity" />
+                  </h1>
                 )}
-                {project.niche && (
-                  <span className="px-2.5 py-1 rounded-full text-2xs font-medium bg-accent/10 text-accent border border-accent/20">
-                    {project.niche}
-                  </span>
-                )}
-                {project.type && (
-                  <span className="px-2.5 py-1 rounded-full text-2xs font-medium bg-muted text-muted-foreground border border-border">
-                    {project.type}
-                  </span>
-                )}
+
+                <p className="text-2xs text-muted-foreground mt-1">
+                  Atualizado em {new Date(project.updated_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+                </p>
+
+                {/* Completion bar */}
+                <div className="mt-4 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xs text-muted-foreground font-medium">Completude do projeto</span>
+                    <span className="text-2xs font-semibold text-foreground">{completionPercent}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full bg-primary"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${completionPercent}%` }}
+                      transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+                    />
+                  </div>
+                  <p className="text-2xs text-muted-foreground">
+                    {completedSections} de {totalSections} seções geradas
+                  </p>
+                </div>
               </div>
 
-              {/* Title */}
-              {editingTitle ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    autoFocus
-                    value={titleDraft}
-                    onChange={e => setTitleDraft(e.target.value)}
-                    onBlur={handleTitleSave}
-                    onKeyDown={e => { if (e.key === "Enter") handleTitleSave(); if (e.key === "Escape") setEditingTitle(false); }}
-                    className="font-display font-bold text-xl text-foreground bg-transparent border-b-2 border-primary outline-none w-full"
-                  />
-                </div>
-              ) : (
-                <h1
-                  className="font-display font-bold text-xl text-foreground cursor-pointer hover:text-primary transition-colors flex items-center gap-2 group"
-                  onClick={() => { setTitleDraft(project.title); setEditingTitle(true); }}
-                >
-                  {project.title}
-                  <Edit3 className="w-3.5 h-3.5 opacity-0 group-hover:opacity-50 transition-opacity" />
-                </h1>
-              )}
-
-              <p className="text-2xs text-muted-foreground mt-1">
-                Atualizado em {new Date(project.updated_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
-              </p>
-            </div>
-
-            {/* Score + actions */}
-            <div className="flex items-center gap-3 flex-shrink-0">
-              {project.quality_score !== null && (
-                <ScoreRing score={project.quality_score} size="sm" showLabel={false} />
-              )}
-
-              <button
-                onClick={() => toggleFavorite.mutate({ id: project.id, isFavorite: project.is_favorite })}
-                className={cn("p-2 rounded-lg border transition-all duration-150",
-                  project.is_favorite
-                    ? "bg-warning/10 border-warning/30 text-warning"
-                    : "border-border hover:border-warning/30 hover:text-warning text-muted-foreground"
+              {/* Score + actions */}
+              <div className="flex items-start gap-3 flex-shrink-0">
+                {project.quality_score !== null && (
+                  <div className="flex flex-col items-center gap-1">
+                    <ScoreRing score={project.quality_score} size="sm" showLabel={false} />
+                    {scoreClassification && (
+                      <span className={cn("text-[10px] font-semibold", scoreClassification.color)}>
+                        {scoreClassification.label}
+                      </span>
+                    )}
+                  </div>
                 )}
-                aria-label={project.is_favorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-              >
-                {project.is_favorite ? <Star className="w-4 h-4 fill-warning" /> : <StarOff className="w-4 h-4" />}
-              </button>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="p-2 rounded-lg border border-border hover:border-primary/30 hover:bg-surface transition-all duration-150 text-muted-foreground"
-                    aria-label="Mais opções">
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onClick={() => handleStatusChange("active")} disabled={project.status === "active"}>
-                    <Check className="w-3.5 h-3.5 mr-2 text-success" />
-                    Marcar como Ativo
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleStatusChange("draft")} disabled={project.status === "draft"}>
-                    <Edit3 className="w-3.5 h-3.5 mr-2" />
-                    Marcar como Rascunho
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleStatusChange("archived")} disabled={project.status === "archived"}>
-                    <Archive className="w-3.5 h-3.5 mr-2" />
-                    Arquivar Projeto
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-destructive focus:text-destructive">
-                    <Trash2 className="w-3.5 h-3.5 mr-2" />
-                    Excluir Projeto
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                <button
+                  onClick={() => toggleFavorite.mutate({ id: project.id, isFavorite: project.is_favorite })}
+                  className={cn("p-2 rounded-lg border transition-all duration-150",
+                    project.is_favorite
+                      ? "bg-warning/10 border-warning/30 text-warning"
+                      : "border-border hover:border-warning/30 hover:text-warning text-muted-foreground"
+                  )}
+                  aria-label={project.is_favorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                >
+                  {project.is_favorite ? <Star className="w-4 h-4 fill-warning" /> : <StarOff className="w-4 h-4" />}
+                </button>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="p-2 rounded-lg border border-border hover:border-primary/30 hover:bg-surface transition-all duration-150 text-muted-foreground"
+                      aria-label="Mais opções">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem onClick={handleDuplicate}>
+                      <Copy className="w-3.5 h-3.5 mr-2" />
+                      Duplicar projeto
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleShare}>
+                      <Share2 className="w-3.5 h-3.5 mr-2" />
+                      Copiar link do projeto
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleStatusChange("active")} disabled={project.status === "active"}>
+                      <Check className="w-3.5 h-3.5 mr-2 text-success" />
+                      Marcar como Ativo
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleStatusChange("draft")} disabled={project.status === "draft"}>
+                      <Edit3 className="w-3.5 h-3.5 mr-2" />
+                      Marcar como Rascunho
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleStatusChange("archived")} disabled={project.status === "archived"}>
+                      <Archive className="w-3.5 h-3.5 mr-2" />
+                      Arquivar Projeto
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-destructive focus:text-destructive">
+                      <Trash2 className="w-3.5 h-3.5 mr-2" />
+                      Excluir Projeto
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -1582,7 +1958,7 @@ const ProjectDetailPage = () => {
               key={tabId}
               onClick={() => setActiveTab(tabId)}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-2xs font-medium transition-all whitespace-nowrap",
+                "relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-2xs font-medium transition-all whitespace-nowrap",
                 activeTab === tabId
                   ? "bg-primary/10 text-primary border border-primary/20"
                   : "text-muted-foreground hover:text-foreground hover:bg-surface border border-transparent"
@@ -1590,6 +1966,10 @@ const ProjectDetailPage = () => {
             >
               <Icon className="w-3 h-3" />
               {label}
+              {/* Content indicator dot */}
+              {tabHasContent[tabId] && activeTab !== tabId && (
+                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-success" />
+              )}
             </button>
           ))}
         </div>
@@ -1618,7 +1998,14 @@ const ProjectDetailPage = () => {
             {activeTab === "seo"       && isWebsite && <AIContentTabWrapper projectId={project.id} contentType="site_seo" icon={TrendingUp} title="Estratégia SEO" description="Keywords, meta tags, schema markup e checklist técnico de SEO." persistedContent={aiContentCache["site_seo"] ?? null} onContentGenerated={handleContentGenerated} />}
             {activeTab === "structure" && isWebsite && <AIContentTabWrapper projectId={project.id} contentType="site_structure" icon={Code2} title="Arquitetura e Estrutura" description="Stack técnica, estrutura de pastas, componentes e configuração de deploy." persistedContent={aiContentCache["site_structure"] ?? null} onContentGenerated={handleContentGenerated} />}
             {activeTab === "exports"   && <InlineExportTab project={project} />}
-            {activeTab === "eval"      && <EvalTab projectId={project.id} currentScore={project.quality_score} />}
+            {activeTab === "eval"      && (
+              <EvalTab
+                projectId={project.id}
+                currentScore={project.quality_score}
+                cachedResult={evalResultCache}
+                onResultCached={setEvalResultCache}
+              />
+            )}
             {activeTab === "ai"        && <AIReviewTab projectId={project.id} />}
           </motion.div>
         </AnimatePresence>
