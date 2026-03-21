@@ -148,7 +148,7 @@ const ProfileSection = () => {
 
 // ── Appearance section ─────────────────────────────────────────────────────────
 const AppearanceSection = () => {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme } = useAppTheme();
 
   return (
     <div className="p-6 rounded-xl border border-border bg-card space-y-5">

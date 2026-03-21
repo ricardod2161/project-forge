@@ -47,6 +47,7 @@ export interface CreateProjectInput {
 export interface ProjectMetrics {
   totalProjects: number;
   activeProjects: number;
+  favoriteProjects: number;
   totalPrompts: number;
   avgScore: number | null;
 }
