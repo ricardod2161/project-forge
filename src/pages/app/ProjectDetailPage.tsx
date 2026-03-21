@@ -1296,6 +1296,7 @@ const ProjectDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  // TABS computed after project loads — use SYSTEM_TABS as fallback for loading skeleton
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
