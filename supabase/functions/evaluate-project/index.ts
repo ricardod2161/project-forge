@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callOpenAIWithTools } from "../_shared/ai-providers.ts";
 
 const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
 const corsHeaders = {
@@ -66,9 +67,6 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurado");
-
     const systemPrompt = `Você é um consultor sênior de produto e arquitetura de software com 20 anos de experiência avaliando projetos de software para investidores e times de desenvolvimento. Você avalia projetos em 7 dimensões de forma rigorosa e honesta. Retorne sempre via tool calling com o formato exato especificado.`;
 
     const userPrompt = `Avalie o seguinte projeto de software nas 7 dimensões abaixo. Seja rigoroso, honesto e específico — evite scores inflados:
@@ -93,69 +91,45 @@ serve(async (req) => {
 6. **Monetização** — O modelo de negócio é adequado para o nicho e tipo de produto?
 7. **Maturidade** — O nível de detalhe e pensamento demonstra maturidade do projeto?`;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "submit_evaluation",
-              description: "Submete a avaliação completa do projeto com scores por dimensão",
-              parameters: {
-                type: "object",
-                properties: {
-                  dimensions: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        name: { type: "string" },
-                        score: { type: "number", minimum: 0, maximum: 100 },
-                        justification: { type: "string" },
-                        recommendations: { type: "array", items: { type: "string" } },
-                      },
-                      required: ["name", "score", "justification", "recommendations"],
-                    },
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "submit_evaluation",
+          description: "Submete a avaliação completa do projeto com scores por dimensão",
+          parameters: {
+            type: "object",
+            properties: {
+              dimensions: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    score: { type: "number", minimum: 0, maximum: 100 },
+                    justification: { type: "string" },
+                    recommendations: { type: "array", items: { type: "string" } },
                   },
-                  overall_score: { type: "number", minimum: 0, maximum: 100 },
-                  summary: { type: "string" },
-                  top_priorities: { type: "array", items: { type: "string" }, maxItems: 3 },
+                  required: ["name", "score", "justification", "recommendations"],
                 },
-                required: ["dimensions", "overall_score", "summary", "top_priorities"],
               },
+              overall_score: { type: "number", minimum: 0, maximum: 100 },
+              summary: { type: "string" },
+              top_priorities: { type: "array", items: { type: "string" }, maxItems: 3 },
             },
+            required: ["dimensions", "overall_score", "summary", "top_priorities"],
           },
-        ],
-        tool_choice: { type: "function", function: { name: "submit_evaluation" } },
-      }),
-    });
+        },
+      },
+    ];
 
-    if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "Limite de requisições atingido. Aguarde alguns minutos." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error(`AI Gateway error: ${aiResponse.status}`);
-    }
+    const toolChoice = { type: "function", function: { name: "submit_evaluation" } };
 
-    const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+    const toolCall = await callOpenAIWithTools(systemPrompt, userPrompt, tools, toolChoice, {
+      temperature: 0.3,
+      maxTokens: 2000,
+    }) as { function: { arguments: string } } | undefined;
+
     if (!toolCall) throw new Error("IA não retornou avaliação estruturada");
 
     const evaluation: EvaluationResult = JSON.parse(toolCall.function.arguments);
@@ -186,8 +160,19 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("evaluate-project error:", err);
+    const status = (err as { status?: number }).status;
+    if (status === 429) {
+      return new Response(JSON.stringify({ error: "Limite de requisições OpenAI atingido. Aguarde alguns minutos." }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (status === 401 || status === 402) {
+      return new Response(JSON.stringify({ error: "OPENAI_API_KEY inválida ou sem créditos. Verifique em platform.openai.com." }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Erro interno" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

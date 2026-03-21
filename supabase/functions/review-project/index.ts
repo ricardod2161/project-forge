@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callGroq, callGemini } from "../_shared/ai-providers.ts";
 
 const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
 const corsHeaders = {
@@ -8,17 +9,64 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "submit_review_findings",
+      description: "Submete a lista completa de achados da revisão do projeto de software.",
+      parameters: {
+        type: "object",
+        properties: {
+          findings: {
+            type: "array",
+            description: "Lista de achados da análise",
+            items: {
+              type: "object",
+              properties: {
+                category: {
+                  type: "string",
+                  enum: ["lacuna", "inconsistencia", "melhoria", "risco"],
+                  description: "Categoria do achado",
+                },
+                severity: {
+                  type: "string",
+                  enum: ["critico", "importante", "sugestao"],
+                  description: "Severidade do achado",
+                },
+                title: {
+                  type: "string",
+                  description: "Título conciso do problema (máx 80 chars)",
+                },
+                description: {
+                  type: "string",
+                  description: "Descrição detalhada do problema identificado",
+                },
+                recommendation: {
+                  type: "string",
+                  description: "Recomendação específica e acionável para resolver o problema",
+                },
+              },
+              required: ["category", "severity", "title", "description", "recommendation"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["findings"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
+const TOOL_CHOICE = { type: "function", function: { name: "submit_review_findings" } };
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY não configurado");
-    }
-
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -101,104 +149,61 @@ Severidades: "critico" para bloqueadores de produção, "importante" para gaps s
 
     const userPrompt = `Analise este projeto de software e retorne seus findings:\n\n${projectContext}`;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "submit_review_findings",
-              description: "Submete a lista completa de achados da revisão do projeto de software.",
-              parameters: {
-                type: "object",
-                properties: {
-                  findings: {
-                    type: "array",
-                    description: "Lista de achados da análise",
-                    items: {
-                      type: "object",
-                      properties: {
-                        category: {
-                          type: "string",
-                          enum: ["lacuna", "inconsistencia", "melhoria", "risco"],
-                          description: "Categoria do achado",
-                        },
-                        severity: {
-                          type: "string",
-                          enum: ["critico", "importante", "sugestao"],
-                          description: "Severidade do achado",
-                        },
-                        title: {
-                          type: "string",
-                          description: "Título conciso do problema (máx 80 chars)",
-                        },
-                        description: {
-                          type: "string",
-                          description: "Descrição detalhada do problema identificado",
-                        },
-                        recommendation: {
-                          type: "string",
-                          description: "Recomendação específica e acionável para resolver o problema",
-                        },
-                      },
-                      required: ["category", "severity", "title", "description", "recommendation"],
-                      additionalProperties: false,
-                    },
-                  },
-                },
-                required: ["findings"],
-                additionalProperties: false,
-              },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "submit_review_findings" } },
-      }),
-    });
+    // Tenta Groq 70B com tool calling; se rate limit, usa Gemini com parsing manual
+    let findings: unknown[];
 
-    if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Limite de requisições atingido. Tente novamente em alguns minutos." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    try {
+      const { toolCall } = await callGroq(systemPrompt, userPrompt, {
+        model: "llama-3.3-70b-versatile",
+        temperature: 0.5,
+        maxTokens: 4096,
+        tools: TOOLS,
+        toolChoice: TOOL_CHOICE,
+      });
+
+      if (!toolCall) throw new Error("Groq não retornou tool call");
+      const parsed = JSON.parse((toolCall as { function: { arguments: string } }).function.arguments);
+      findings = parsed.findings;
+
+    } catch (groqErr: unknown) {
+      const groqStatus = (groqErr as { status?: number }).status;
+
+      if (groqStatus === 429) {
+        console.warn("Groq rate limit (429), fallback para Gemini com parsing de texto…");
+
+        // Fallback: Gemini retorna JSON dentro de um bloco markdown
+        const fallbackPrompt = `${systemPrompt}\n\n${userPrompt}
+
+IMPORTANTE: Retorne os findings em formato JSON válido dentro de um bloco \`\`\`json ... \`\`\`.
+O JSON deve ter a chave "findings" contendo um array de objetos com: category, severity, title, description, recommendation.`;
+
+        const geminiText = await callGemini(fallbackPrompt, { maxTokens: 4096, temperature: 0.5 });
+
+        const jsonMatch = geminiText.match(/```json\s*([\s\S]*?)\s*```/);
+        if (!jsonMatch) throw new Error("Gemini não retornou JSON estruturado nos findings");
+
+        const parsed = JSON.parse(jsonMatch[1]);
+        findings = parsed.findings;
+
+      } else {
+        throw groqErr;
       }
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Créditos insuficientes. Acesse Configurações > Uso para adicionar créditos." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      const errText = await aiResponse.text();
-      console.error("AI Gateway error:", aiResponse.status, errText);
-      throw new Error(`AI Gateway retornou erro ${aiResponse.status}`);
     }
-
-    const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-
-    if (!toolCall) {
-      throw new Error("IA não retornou findings estruturados");
-    }
-
-    const { findings } = JSON.parse(toolCall.function.arguments);
 
     return new Response(
       JSON.stringify({ findings }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (err) {
+
+  } catch (err: unknown) {
     console.error("review-project error:", err);
+    const status = (err as { status?: number }).status;
+    if (status === 429) {
+      return new Response(
+        JSON.stringify({ error: "Limite de requisições atingido. Tente novamente em alguns minutos." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     const message = err instanceof Error ? err.message : "Erro interno ao processar revisão";
     return new Response(
       JSON.stringify({ error: message }),
