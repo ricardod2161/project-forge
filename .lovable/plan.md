@@ -1,113 +1,169 @@
 
-## Upgrade de Mockups — Imagens Ultra-Realistas v4.0
+## Análise Completa do Codebase — Diagnóstico Real
 
-### Diagnóstico real do sistema atual
+**O que já está implementado e funcionando (não mexer):**
+- `useProjectWizard`: `isSubmitting` já está FORA do `partialize` — item 1.3 já resolvido
+- `AppSidebar`: botão "Novo Projeto" já existe e funciona em collapsed E expanded — item 3.2 já resolvido
+- `AppHeader`: `useEffect` com `keydown` para cmd+K já existe, hint `⌘K` já aparece — item 3.1 já resolvido
+- `ProjectsPage`: busca, filtros de status, ordenação e debounce já implementados — itens 2.9 e 4.2 já resolvidos
+- `SettingsPage`: `SecuritySection` (resetPassword), `PlanSection`, `AppearanceSection` já existem — partes de 2.7 já resolvidas
+- `ExportsPage`: já tem exportação Markdown E JSON — 2.8 parcialmente resolvido (falta incluir prompts)
+- `EvaluationsPage`: já tem cards de score + `EvaluateButton`
+- `ProjectDetailPage`: já tem tab "Avaliação" com `RadarChart` + dimensões detalhadas + prioridades (mas salvando só em memória, não em tabela dedicada)
 
-**O que está funcionando:**
-- Edge Function `generate-screen-mockup` existe e faz upload no Storage
-- Modelo já é `google/gemini-3.1-flash-image-preview` (correto)
-- Parser de telas robusto com 6 padrões regex
-- Persistência via `project.metadata.mockups`
-- Lightbox, download, progresso em lote — tudo funcional
+**Bugs e lacunas reais identificados:**
 
-**O PROBLEMA REAL — por que as imagens não são realistas:**
+**CRÍTICO:**
+- `next-themes` está em `package.json` e importado em `src/components/ui/sonner.tsx` — não pode ser simplesmente removido sem substituir o `useTheme`
+- `tsconfig.app.json`: `strict: false`, `noImplicitAny: false` — risco de bugs silenciosos
+- `generate-prompt/index.ts`: usa `google/gemini-3-flash-preview` + prompt exige apenas "400 palavras" — qualidade baixa
+- `useAllUserPrompts` e `useAllVersions` em `useProjectDetail.ts`: não usam `useAuth()` — dependem só de RLS
+- `ProjectDetailPage`: usa Skeleton local (`const Skeleton = ...`) em vez de `@/components/ui/skeleton`
+- `EvaluationsPage`: usa Skeleton local em vez do shadcn
+- `App.tsx`: sem `React.lazy` — todas as 11 páginas do `/app/**` carregam no bundle inicial, sem `Suspense`
+- `QueryClient`: sem `refetchOnWindowFocus: false` — refetch desnecessário ao voltar ao tab
+- `useProjects`: não inclui `prompts(count)` na query — `ProjectCard` sempre recebe `promptsCount=0`
 
-O prompt atual, apesar de extenso, tem falhas críticas de engenharia de prompt para geração de imagens:
+**IMPORTANTES:**
+- `NewProjectPage`: nenhuma validação por etapa — usuário pode avançar com campos vazios
+- `SettingsPage`: falta seção "Preferências de IA" (salvar em `profiles.preferences`)
+- `SettingsPage`: falta "Zona de Perigo" com exclusão de conta
+- `ExportsPage`: exportação não inclui prompts gerados
+- `ProjectDetailPage`: tab "Prompts" mostra lista simples, sem sub-abas por tipo (10 tipos) e sem botão "Gerar" inline por tipo
+- `EvaluationsPage`: mostra apenas score total, sem dimensões detalhadas (essas existem só na aba do projeto)
+- Tabela `evaluations` não existe — scores por dimensão não persistem; avaliação recalcula sempre do zero
+- Sem `useDuplicateProject` em `useProjects.ts`
+- Sem auto-save com indicador visual no wizard
+- Sem barra de limite do plano Free no `AppLayout`
+- `App.tsx`: sem `ErrorBoundary`
 
-1. **Prompt não força o modelo a gerar uma IMAGEM REAL de UI** — o texto é longo mas não diz "create a SCREENSHOT", "render actual UI components as pixels", "photorealistic interface". O modelo pode interpretar como "descreva" ao invés de "renderize".
+**MENORES:**
+- `useProjectWizard` partialize: `isSubmitting` já está excluído — confirmado OK
+- `src/components/ui/sonner.tsx`: usa `useTheme` do `next-themes` — precisa de wrapper para não quebrar ao remover
+- `.env.example` não existe
+- `README.md` genérico
 
-2. **Sem anchoring visual para o modelo de imagem** — prompts de geração de imagem precisam de âncoras como "as seen in Figma", "high-resolution product screenshot", "render exactly as it would appear on screen". Sem isso, o modelo gera ilustrações abstratas.
+---
 
-3. **`## Tela: NomeDaTela` no contentInstructions usa formato exato** mas o modelo IA pode variar — e o parser já lida com isso. Porém a `screen_description` que chega para a Edge Function de imagem está sendo truncada em 400 chars, cortando contexto visual crítico.
+## Plano de Execução — 6 Blocos Sequenciais
 
-4. **Aspect ratio fixo 9/16** no card — mas se o projeto é Desktop (Web), gerar em 9/16 é errado. Precisa de `16/9` para Web e `9/16` para Mobile.
+### Bloco 1 — Correções críticas de qualidade e segurança
+**Arquivos:** `tsconfig.app.json`, `src/App.tsx`, `src/hooks/useProjectDetail.ts`, `src/components/ui/sonner.tsx`
 
-5. **Sem `style_preset` no card** — o usuário não pode pedir "mais claro", "mais colorido", "iOS style" — tudo vai dark por padrão.
+1.1 **TypeScript strict mode** — ativar `strict: true`, `noImplicitAny: true`, `noUnusedLocals: true`, `noUnusedParameters: true`. Corrigir erros resultantes em todos os arquivos (substituir `any` por tipos explícitos, remover imports não usados, adicionar tipos em parâmetros de função).
 
-6. **Prompt não usa técnica de "negative prompting"** — sem dizer o que NÃO gerar: "no text overlays, no Lorem ipsum, no wireframe sketches, no cartoon style".
+1.2 **`next-themes`** — `sonner.tsx` usa `useTheme` do `next-themes`. Substituir por `useAppTheme` para remover a dependência. Depois anotar no `package.json` para remoção.
 
-7. **`screen_description` passa apenas 4 linhas de texto** ao invés de todo o contexto estruturado da tela (componentes, estados, navegação) que foi gerado pelo `generate-ai-content`.
+1.3 **`refetchOnWindowFocus: false`** no `QueryClient` em `App.tsx`.
 
-8. **Nenhum context injection de features ricas** — se o projeto é "Clínica SaaS", o mockup deveria ter campos "Paciente", "CRM", "Agendamento" — mas o prompt apenas menciona o nicho sem aprofundar.
+1.4 **`React.lazy` + `Suspense`** para todas as páginas `/app/**` em `App.tsx`. Criar `PageSkeleton` minimalista.
 
-### Solução — 3 mudanças de alto impacto
+1.5 **`useAllUserPrompts` e `useAllVersions`** — adicionar `useAuth()` + filtro `user_id` explícito + `enabled: !!user?.id`.
 
-#### 1. Edge Function `generate-screen-mockup` — Prompt de engenharia avançada
+1.6 **`useUpdateProject`** — criar tipo explícito `ProjectUpdatePayload` em vez do cast `as Record<string, unknown>`.
 
-**Técnica: Hierarchical Photorealistic UI Prompt**
+### Bloco 2 — Persistência de avaliações (tabela evaluations)
+**Arquivos:** `supabase/migrations/[ts]_evaluations.sql`, `src/hooks/useProjectDetail.ts`, `supabase/functions/evaluate-project/index.ts`
 
-```
-CRITICAL INSTRUCTION: Generate a PHOTOREALISTIC HIGH-FIDELITY screenshot of a real software application UI.
-This must look like an ACTUAL SCREENSHOT taken from a real, production-ready software product.
-NOT a wireframe. NOT a sketch. NOT an illustration. A REAL UI screenshot.
+2.1 **Migration SQL** para criar `public.evaluations` com `id`, `project_id`, `user_id`, `overall_score`, `dimensions` (JSONB), `summary`, `top_priorities` (JSONB), `created_at`. RLS com `is_project_owner`. Índices em `project_id` e `user_id`.
 
-[contexto do projeto]
+2.2 **Atualizar `evaluate-project`** para salvar na tabela `evaluations` além de atualizar `projects.quality_score`.
 
-SCREEN: "${screen_name}"
-DETAILED DESCRIPTION:
-${screen_description}  ← agora passa MAIS contexto
+2.3 **Criar `useProjectEvaluation(projectId)`** em `useProjectDetail.ts` que busca a avaliação mais recente da tabela `evaluations`.
 
-PIXEL-LEVEL RENDERING REQUIREMENTS:
-- Render as a REAL application screenshot at exact ${resolution} resolution
-- Every UI component must be FULLY RENDERED with realistic colors, shadows, and typography
-- NO placeholder boxes — replace with ACTUAL rendered components
-- Text must be READABLE and REALISTIC (domain-specific, not Lorem ipsum)
-- Background: ${bgColor} — SOLID rendered pixels, not a sketch
-- Buttons must look CLICKABLE with proper states (hover/default)
-- Icons must be ACTUAL icons (not shapes) — use recognizable icon designs
-- Input fields must have REALISTIC borders, focus rings, placeholder text
-- Show a COMPLETE screen — status bar at top (mobile) / window chrome (desktop)
+2.4 **`EvalTab` em `ProjectDetailPage`** — carregar dados de `useProjectEvaluation` (persistido) em vez de estado local. Manter o visual atual (RadarChart + dimensões + prioridades).
 
-NEGATIVE PROMPT: no wireframe lines, no hand-drawn style, no cartoon, no abstract art, 
-no placeholder text, no grey boxes, no sketch lines, no Lorem ipsum, no flat icons only
+2.5 **`EvaluationsPage`** — expandir cards dos projetos avaliados para mostrar dimensões da última avaliação (mini progress bars por dimensão, top_priorities). Substituir Skeleton local por `import { Skeleton } from "@/components/ui/skeleton"`.
 
-STYLE REFERENCE: This should look like a screenshot from Linear, Vercel Dashboard, or Figma — 
-professional SaaS tool at the highest visual quality level.
-```
+### Bloco 3 — Funcionalidades no Wizard e ProjectCard
+**Arquivos:** `src/pages/app/NewProjectPage.tsx`, `src/hooks/useProjects.ts`, `src/components/ProjectCard.tsx`
 
-#### 2. Passar a descrição COMPLETA da tela (não truncada)
+3.1 **Validação por etapa no Wizard:**
+- Etapa 1: `nextStep()` só se `idea.trim().length >= 30` — contador inline `X/30 chars`
+- Etapa 2: `nextStep()` só se `type && niche && platform` — highlight warning em cards não selecionados
+- Etapa 3: `nextStep()` só se `audience.trim().length >= 10`
+- Etapa 4: mensagens rotativas durante `isSubmitting`
 
-Atualmente `ScreensWithMockups` passa apenas as primeiras 4 linhas como `screen_description`. Vamos extrair **toda a seção da tela** do Markdown gerado pelo `generate-ai-content` e enviar completo para a Edge Function.
+3.2 **Auto-save com indicador visual** no wizard — `lastSaved` state + debounce 800ms + badge sutil "Salvo automaticamente".
 
-No `parseScreens()`, ao invés de coletar apenas 4 linhas, coletar até 800 chars da descrição completa da tela. Isso garante que todos os componentes UI, estados e dados listados pelo Gemini 2.5 Flash chegam ao modelo de imagem.
+3.3 **`useProjects`** — modificar query para incluir `prompts(count)` e mapear `prompts_count` no tipo `Project`.
 
-#### 3. Aspect ratio inteligente + Device Frame
+3.4 **`useDuplicateProject`** em `useProjects.ts` — buscar projeto, criar cópia com ` (Cópia)` no título e `status: draft`. `ProjectCard` — adicionar opção "Duplicar" no dropdown de ações.
 
-- Detectar plataforma do projeto: se `platform` contém "mobile/ios/android" → `aspect-[9/16]`; caso contrário (Web/Desktop) → `aspect-[16/10]`
-- Adicionar `platform_type` no payload da request para a Edge Function
-- No prompt: adaptar resolução e layout conforme plataforma
+### Bloco 4 — SettingsPage completo + ExportsPage
+**Arquivos:** `src/pages/app/SettingsPage.tsx`, `src/pages/app/ExportsPage.tsx`
 
-### Arquivos a modificar
+4.1 **SettingsPage — Preferências de IA:**
+- Select "Nível de detalhe" (Resumido | Completo | Máximo detalhe)
+- Toggle "Sugestões proativas no Dashboard"
+- Persistir em `profiles.preferences` via mutation
 
-| Arquivo | Mudança | Impacto |
+4.2 **SettingsPage — Zona de Perigo:**
+- Botão "Excluir minha conta" com `AlertDialog` que exige digitar o email
+- Chamar `supabase.auth.signOut()` + toast informando que a exclusão está em processamento (conta real requer admin SDK via Edge Function — mostrar UI adequada sem prometer exclusão imediata)
+
+4.3 **ExportsPage — incluir prompts:**
+- `useProjectPrompts` no ExportsPage
+- Nova opção de export "Prompts" — concatena todos os prompts do projeto com seções por tipo, versão, tokens e data
+- Adicionar terceiro botão no format toggle: `markdown | json | prompts`
+
+### Bloco 5 — PromptsTab inline por tipo + Skeletons
+**Arquivos:** `src/pages/app/ProjectDetailPage.tsx`
+
+5.1 **`PromptsTab`** — redesign completo com sub-abas horizontais por tipo (10 tipos: master, frontend, backend, database, dashboard, mvp, premium, correction, refactoring, multiplatform):
+- Badge por tipo: "Não gerado" (cinza) / "Gerado" (verde, mostrando versão)
+- Botão "Gerar" (primeira vez) / "Regenerar" (já existe)
+- Área de preview com font mono + botão "Copiar"
+- Tokens estimados no footer de cada prompt
+- Chamada `supabase.functions.invoke("generate-prompt", { body: { project_id, prompt_type } })`
+
+5.2 **`AnimatePresence`** nas trocas de aba — envolver conteúdo com `motion.div` `key={activeTab}`.
+
+5.3 **Substituir Skeleton local** em `ProjectDetailPage` e `EvaluationsPage` por `import { Skeleton } from "@/components/ui/skeleton"`.
+
+5.4 **Barra de limite Free** em `AppLayout`:
+- Buscar `profile.plan` e métricas
+- Se `plan === "free"`: mostrar banner discreto no topo do `main` com progresso "X/3 projetos"
+
+### Bloco 6 — Documentação e Edge Function de qualidade
+**Arquivos:** `.env.example`, `README.md`, `supabase/functions/generate-prompt/index.ts`
+
+6.1 **`generate-prompt`** — upgrade de qualidade:
+- Modelo: `google/gemini-2.5-flash` (mais capaz)
+- Prompt: exigir mínimo 900 palavras, estruturado nas 7 seções definidas (CONTEXTO / STACK / MÓDULOS / BANCO / REGRAS / COMPORTAMENTO / ENTREGA)
+- `systemPrompt`: adicionar instrução explícita de estrutura e formato
+
+6.2 **CORS `allowedOrigin`** — lê `ALLOWED_ORIGIN` do env (fallback `"*"`) em todas as 6 Edge Functions
+
+6.3 **`.env.example`** criado e documentado
+
+6.4 **`README.md`** atualizado com setup real
+
+---
+
+## Tabela de arquivos por bloco
+
+| Bloco | Arquivo | Tipo |
 |---|---|---|
-| `supabase/functions/generate-screen-mockup/index.ts` | Prompt ultra-realista com negative prompts + context completo | CRÍTICO |
-| `src/components/ScreensWithMockups.tsx` | Parser coleta descrição completa (800 chars) + aspect ratio por plataforma + passa platform_type | ALTO |
-| `src/pages/app/ProjectDetailPage.tsx` | Passar `projectPlatform` para `ScreensTabWrapper` → `ScreensWithMockups` → Edge Function | MÉDIO |
+| 1 | `tsconfig.app.json` | Editar |
+| 1 | `src/App.tsx` | Editar — lazy + Suspense + refetchOnWindowFocus |
+| 1 | `src/components/ui/sonner.tsx` | Editar — trocar next-themes por useAppTheme |
+| 1 | `src/hooks/useProjectDetail.ts` | Editar — tipos + auth em all-prompts/all-versions |
+| 2 | `supabase/migrations/[ts]_evaluations.sql` | Criar |
+| 2 | `supabase/functions/evaluate-project/index.ts` | Editar — salvar em evaluations |
+| 2 | `src/hooks/useProjectDetail.ts` | Editar — useProjectEvaluation hook |
+| 2 | `src/pages/app/EvaluationsPage.tsx` | Editar — dimensões + Skeleton correto |
+| 2 | `src/pages/app/ProjectDetailPage.tsx` | Editar — EvalTab usa dados persistidos |
+| 3 | `src/pages/app/NewProjectPage.tsx` | Editar — validação por etapa + auto-save |
+| 3 | `src/hooks/useProjects.ts` | Editar — prompts(count) + useDuplicateProject |
+| 3 | `src/components/ProjectCard.tsx` | Editar — promptsCount real + duplicar |
+| 4 | `src/pages/app/SettingsPage.tsx` | Editar — prefs IA + zona de perigo |
+| 4 | `src/pages/app/ExportsPage.tsx` | Editar — incluir prompts na exportação |
+| 5 | `src/pages/app/ProjectDetailPage.tsx` | Editar — PromptsTab + AnimatePresence + Skeleton |
+| 5 | `src/layouts/AppLayout.tsx` | Editar — barra Free |
+| 6 | `supabase/functions/generate-prompt/index.ts` | Editar — modelo melhor + estrutura 900 palavras |
+| 6 | todas as 6 Edge Functions | Editar — CORS allowedOrigin |
+| 6 | `.env.example` | Criar |
+| 6 | `README.md` | Editar |
 
-### Detalhes da nova arquitetura de prompt
-
-**Prompt estruturado em 5 blocos:**
-1. `CRITICAL INSTRUCTION` — instrução imperativa de "screenshot real"
-2. `PROJECT CONTEXT` — nicho, título, público, plataforma, features
-3. `SCREEN SPECIFICATION` — nome + descrição completa da tela
-4. `VISUAL RENDERING REQUIREMENTS` — especificações pixel a pixel
-5. `NEGATIVE PROMPT` — o que NÃO gerar
-6. `STYLE REFERENCE` — âncoras visuais ("like Linear", "like Vercel", "like Figma")
-
-**Contextualização por nicho** — nova função `getNicheContext()`:
-- `clinica/saúde` → "patient records, appointment calendar, medical staff profiles, CPF/CRM fields"
-- `ecommerce` → "product catalog, cart summary, order status, SKU, price variations"  
-- `financeiro` → "charts, transaction history, balance cards, currency formatting BRL"
-- `educação` → "course cards, progress bars, video player, quiz interface"
-- etc.
-
-**Âncoras visuais por tipo:**
-- Web SaaS → "similar to Linear.app, Vercel dashboard, Notion"
-- Mobile → "similar to Instagram, WhatsApp, Uber interface quality"
-- Admin → "similar to Retool, Metabase, Grafana"
-
-### Ordem de execução
-1. Edge Function `generate-screen-mockup` — novo prompt completo
-2. `ScreensWithMockups` — parser com mais contexto + aspect ratio inteligente
-3. `ProjectDetailPage` — passar platform para ScreensTabWrapper
+**Ordem de execução:** Bloco 1 → 2 → 3 → 4 → 5 → 6. Migration do Bloco 2 antes de qualquer código que depende da tabela `evaluations`.
