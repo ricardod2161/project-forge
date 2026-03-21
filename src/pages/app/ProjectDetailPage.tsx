@@ -1203,6 +1203,82 @@ const ScreensTabWrapper = ({
   );
 };
 
+// ── PagesTabWrapper — aba de Páginas com geração de mockups para sites ────────
+const PagesTabWrapper = ({
+  projectId,
+  persistedContent,
+  onContentGenerated,
+  projectMetadata,
+  onUpdateMetadata,
+}: {
+  projectId: string;
+  persistedContent: string | null;
+  onContentGenerated: (contentType: string, content: string) => void;
+  projectMetadata: Record<string, unknown> | null;
+  onUpdateMetadata: (patch: Record<string, unknown>) => void;
+}) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load persisted mockup URLs from project.metadata.page_mockups
+  const initialMockups = (projectMetadata?.page_mockups ?? {}) as Record<string, string>;
+
+  const handleMockupSaved = (pageName: string, url: string) => {
+    if (url.startsWith("data:")) return;
+    const existing = (projectMetadata?.page_mockups ?? {}) as Record<string, string>;
+    onUpdateMetadata({ ...projectMetadata, page_mockups: { ...existing, [pageName]: url } });
+  };
+
+  const handleGenerate = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke("generate-ai-content", {
+        body: { project_id: projectId, content_type: "site_pages" },
+      });
+      if (invokeError) throw invokeError;
+      if (data?.error) {
+        if (data.error.includes("429") || data.error.includes("Limite")) {
+          setError("Limite de requisições atingido. Aguarde alguns minutos.");
+        } else if (data.error.includes("402") || data.error.includes("Créditos")) {
+          setError("Créditos insuficientes.");
+        } else {
+          setError(data.error);
+        }
+        return;
+      }
+      const generated = data?.content ?? "";
+      onContentGenerated("site_pages", generated);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao gerar conteúdo";
+      if (msg.includes("429") || msg.includes("rate")) {
+        setError("Limite de requisições atingido. Aguarde alguns minutos.");
+      } else {
+        setError("Erro ao gerar páginas. Tente novamente.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <ScreensWithMockups
+      projectId={projectId}
+      persistedContent={persistedContent}
+      onContentGenerated={onContentGenerated}
+      isLoading={isLoading}
+      error={error}
+      onGenerate={handleGenerate}
+      initialMockups={initialMockups}
+      onMockupSaved={handleMockupSaved}
+      projectPlatform="Web"
+      sectionLabel="página"
+      emptyTitle="Páginas do Site + Mockups Visuais"
+      emptyDescription="A IA detalhará cada página e seção do site e gerará mockups visuais de alta fidelidade para que você visualize exatamente como ficará cada parte."
+    />
+  );
+};
+
 // ── Tab: Inline Export ───────────────────────────────────────────────────────
 const generateDocFromProject = (project: Project): string => {
   const lines: string[] = [];

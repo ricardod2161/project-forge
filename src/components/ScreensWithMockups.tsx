@@ -635,9 +635,11 @@ const ScreensWithMockups = ({
           <Monitor className="w-7 h-7 text-primary/60" />
         </div>
         <div className="text-center max-w-sm space-y-2">
-          <h3 className="text-sm font-semibold text-foreground">Mapa de Telas + Mockups Visuais</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            {emptyTitle ?? `Mapa de ${sectionLabelPlural.charAt(0).toUpperCase() + sectionLabelPlural.slice(1)} + Mockups Visuais`}
+          </h3>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            A IA mapeará todas as telas do sistema e gerará mockups visuais de alta fidelidade para cada uma, com base no nicho e plataforma do seu projeto.
+            {emptyDescription ?? `A IA mapeará todas as ${sectionLabelPlural} do sistema e gerará mockups visuais de alta fidelidade para cada uma, com base no nicho e plataforma do seu projeto.`}
           </p>
         </div>
         <button
@@ -645,7 +647,7 @@ const ScreensWithMockups = ({
           className="flex items-center gap-2 px-7 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 shadow-sm"
         >
           <Bot className="w-4 h-4" />
-          Gerar Telas com IA
+          Gerar {sectionLabelPlural.charAt(0).toUpperCase() + sectionLabelPlural.slice(1)} com IA
         </button>
       </motion.div>
     );
@@ -656,7 +658,7 @@ const ScreensWithMockups = ({
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
         <div className="flex items-center justify-center py-12">
-          <AIStreamingIndicator label="IA mapeando telas e componentes..." size="md" />
+          <AIStreamingIndicator label={`IA mapeando ${sectionLabelPlural} e componentes...`} size="md" />
         </div>
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
@@ -708,7 +710,7 @@ const ScreensWithMockups = ({
           <span className="text-xs text-muted-foreground font-medium">Gerado por IA</span>
           {screens.length > 0 && (
             <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold border border-primary/20">
-              {screens.length} tela{screens.length !== 1 ? "s" : ""}
+              {screens.length} {sectionLabel}{screens.length !== 1 ? (sectionLabel === "página" ? "s" : sectionLabel === "seção" ? "" : "s") : ""}
             </span>
           )}
           {generatedCount > 0 && (
@@ -735,7 +737,7 @@ const ScreensWithMockups = ({
             onClick={onGenerate}
             disabled={isLoading}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-border hover:border-primary/40 hover:bg-primary/5 hover:text-primary text-muted-foreground transition-all duration-150"
-            title="Regenerar documentação de telas"
+            title={`Regenerar documentação de ${sectionLabelPlural}`}
           >
             <RefreshCw className={cn("w-3 h-3", isLoading && "animate-spin")} />
             Regenerar
@@ -765,7 +767,7 @@ const ScreensWithMockups = ({
               <div>
                 <h3 className="text-xs font-semibold text-foreground">Mockups Visuais</h3>
                 <p className="text-[10px] text-muted-foreground">
-                  Wireframes gerados por IA — clique para expandir
+                  Imagens geradas por IA — clique para expandir
                 </p>
               </div>
             </div>
@@ -819,8 +821,8 @@ const ScreensWithMockups = ({
           </div>
 
           <p className="text-[10px] text-muted-foreground/50 text-center">
-            Geração individual por tela — cada mockup usa o contexto completo do projeto.
-            {screens.length >= 10 && " (Máximo de 10 telas exibidas)"}
+            Geração individual por {sectionLabel} — cada mockup usa o contexto completo do projeto.
+            {screens.length >= 10 && ` (Máximo de 10 ${sectionLabelPlural} exibidas)`}
           </p>
         </motion.div>
       ) : (
@@ -828,7 +830,7 @@ const ScreensWithMockups = ({
           <div className="p-4 rounded-xl border border-dashed border-border text-center space-y-2">
             <ImageIcon className="w-5 h-5 text-muted-foreground/40 mx-auto" />
             <p className="text-xs text-muted-foreground">
-              Nenhuma tela identificada no formato padrão. Clique em "Regenerar" para gerar novamente com o modelo atualizado.
+              Nenhuma {sectionLabel} identificada no formato padrão. Clique em "Regenerar" para gerar novamente com o modelo atualizado.
             </p>
           </div>
         )
