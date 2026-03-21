@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -16,7 +16,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useProjectDetail, useProjectPrompts, useProjectVersions, useUpdateProject, useDeleteProject } from "@/hooks/useProjectDetail";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useToggleFavorite, type Project } from "@/hooks/useProjects";
+import { useToggleFavorite, useDuplicateProject, type Project } from "@/hooks/useProjects";
 import AIStreamingIndicator from "@/components/AIStreamingIndicator";
 import AIContentTab from "@/components/AIContentTab";
 import ScreensWithMockups from "@/components/ScreensWithMockups";
