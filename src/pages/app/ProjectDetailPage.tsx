@@ -1657,7 +1657,7 @@ const ProjectDetailPage = () => {
     if (!project) return;
     const { data, error: dupError } = await supabase
       .from("projects")
-      .insert({
+      .insert([{
         user_id: project.user_id,
         title: `${project.title} (Cópia)`,
         slug: `${project.slug ?? project.id}-copia-${Date.now()}`,
@@ -1667,12 +1667,12 @@ const ProjectDetailPage = () => {
         complexity: project.complexity,
         platform: project.platform,
         audience: project.audience,
-        features: project.features,
+        features: project.features ?? [],
         monetization: project.monetization,
-        integrations: project.integrations,
-        metadata: project.metadata,
-        status: "draft",
-      })
+        integrations: project.integrations ?? [],
+        metadata: project.metadata as never,
+        status: "draft" as const,
+      }])
       .select()
       .single();
     if (dupError) { toast.error("Erro ao duplicar projeto."); return; }
