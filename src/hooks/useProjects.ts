@@ -187,7 +187,7 @@ export function useCreateProject() {
 
       const { data, error } = await supabase
         .from("projects")
-        .insert({
+        .insert([{
           user_id: user.id,
           title: input.title,
           slug: slugify(input.title),
@@ -202,8 +202,8 @@ export function useCreateProject() {
           monetization: input.monetization ?? null,
           integrations: input.integrations ?? [],
           status: input.status ?? "draft",
-          metadata,
-        })
+          metadata: metadata as never,
+        }])
         .select()
         .single();
 
