@@ -198,8 +198,49 @@ const IdeaTab = ({ idea }: { idea: string | null | undefined }) => {
 };
 
 // ── Tab: Prompts ───────────────────────────────────────────────────────────────
+const PROMPT_TYPES_LIST = [
+  { value: "master",        label: "Prompt Mestre" },
+  { value: "frontend",      label: "Frontend" },
+  { value: "backend",       label: "Backend" },
+  { value: "database",      label: "Banco de Dados" },
+  { value: "dashboard",     label: "Dashboard" },
+  { value: "mvp",           label: "MVP" },
+  { value: "premium",       label: "Versão Premium" },
+  { value: "correction",    label: "Correção de Bugs" },
+  { value: "refactoring",   label: "Refatoração" },
+  { value: "multiplatform", label: "Multiplataforma" },
+];
+
 const PromptsTab = ({ projectId }: { projectId: string }) => {
+  const queryClient = useQueryClient();
   const { data: prompts, isLoading } = useProjectPrompts(projectId);
+  const [selectedType, setSelectedType] = useState("master");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showGenerator, setShowGenerator] = useState(false);
+
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-prompt", {
+        body: { project_id: projectId, prompt_type: selectedType },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        if (data.error.includes("429") || data.error.includes("Limite")) toast.error("Limite de requisições atingido.");
+        else if (data.error.includes("402") || data.error.includes("Créditos")) toast.error("Créditos insuficientes.");
+        else toast.error(data.error);
+        return;
+      }
+      toast.success("Prompt gerado e salvo!");
+      queryClient.invalidateQueries({ queryKey: ["prompts", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["all-prompts"] });
+      setShowGenerator(false);
+    } catch (err) {
+      toast.error("Erro ao gerar prompt.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   if (isLoading) return (
     <div className="space-y-3">
@@ -207,37 +248,88 @@ const PromptsTab = ({ projectId }: { projectId: string }) => {
     </div>
   );
 
-  if (!prompts?.length) return (
-    <EmptyTab icon={Zap} title="Nenhum prompt gerado ainda"
-      sub="Acesse o módulo de Prompts para gerar os primeiros prompts deste projeto." />
-  );
-
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-      className="space-y-3">
-      {prompts.map((p) => (
-        <div key={p.id} className="p-4 rounded-xl border border-border bg-card">
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <div>
-              <span className="px-2 py-0.5 rounded-full text-2xs font-medium bg-primary/10 text-primary border border-primary/20 mr-2">
-                {p.type}
-              </span>
-              <span className="text-xs font-semibold text-foreground">{p.title}</span>
+      className="space-y-4">
+
+      {/* Botão gerar prompt */}
+      {!showGenerator ? (
+        <button
+          onClick={() => setShowGenerator(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all active:scale-[0.98]"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Gerar Prompt com IA
+        </button>
+      ) : (
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-3">
+          <h4 className="text-xs font-semibold text-foreground">Selecione o tipo de prompt</h4>
+          <div className="flex flex-wrap gap-2">
+            {PROMPT_TYPES_LIST.map(t => (
+              <button
+                key={t.value}
+                onClick={() => setSelectedType(t.value)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-2xs font-medium border transition-all",
+                  selectedType === t.value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-muted-foreground hover:border-primary/40"
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all disabled:opacity-60"
+            >
+              {isGenerating ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Gerando...</> : <><Bot className="w-3.5 h-3.5" /> Gerar</>}
+            </button>
+            <button
+              onClick={() => setShowGenerator(false)}
+              className="px-4 py-2 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {!prompts?.length ? (
+        <EmptyTab icon={Zap} title="Nenhum prompt gerado ainda"
+          sub="Clique em 'Gerar Prompt com IA' para criar o primeiro prompt deste projeto." />
+      ) : (
+        <div className="space-y-3">
+          {prompts.map((p) => (
+            <div key={p.id} className="p-4 rounded-xl border border-border bg-card">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div>
+                  <span className="px-2 py-0.5 rounded-full text-2xs font-medium bg-primary/10 text-primary border border-primary/20 mr-2">
+                    {p.type}
+                  </span>
+                  <span className="text-xs font-semibold text-foreground">{p.title}</span>
+                </div>
+                {p.content && <CopyButton text={p.content} />}
+              </div>
+              {p.content && (
+                <p className="text-2xs text-muted-foreground line-clamp-3 leading-relaxed font-mono bg-muted/30 rounded-lg p-3">
+                  {p.content}
+                </p>
+              )}
+              <div className="flex items-center gap-3 mt-2 text-2xs text-muted-foreground">
+                <span>v{p.version}</span>
+                {p.tokens_estimate && <span>{p.tokens_estimate} tokens</span>}
+                {p.platform && <span>{p.platform}</span>}
+              </div>
             </div>
-            {p.content && <CopyButton text={p.content} />}
-          </div>
-          {p.content && (
-            <p className="text-2xs text-muted-foreground line-clamp-3 leading-relaxed font-mono bg-muted/30 rounded-lg p-3">
-              {p.content}
-            </p>
-          )}
-          <div className="flex items-center gap-3 mt-2 text-2xs text-muted-foreground">
-            <span>v{p.version}</span>
-            {p.tokens_estimate && <span>{p.tokens_estimate} tokens</span>}
-            {p.platform && <span>{p.platform}</span>}
-          </div>
+          ))}
         </div>
-      ))}
+      )}
+
     </motion.div>
   );
 };
