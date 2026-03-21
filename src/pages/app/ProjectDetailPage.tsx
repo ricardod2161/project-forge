@@ -5,14 +5,17 @@ import {
   Star, StarOff, ArrowLeft, Copy, Check, Layers, Lightbulb, Code2,
   Monitor, Database, ScrollText, Zap, Download, BarChart3, History,
   Bot, MoreHorizontal, Trash2, Archive, Edit3, Tag, Users, Globe, Puzzle,
-  RefreshCw, AlertTriangle, AlertCircle, Lightbulb as LightbulbIcon, TrendingUp, ShieldAlert
+  RefreshCw, AlertTriangle, AlertCircle, Lightbulb as LightbulbIcon, TrendingUp, ShieldAlert,
+  Plus, Loader2, RadarIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { useProjectDetail, useProjectPrompts, useProjectVersions, useUpdateProject, useDeleteProject } from "@/hooks/useProjectDetail";
 import { useToggleFavorite } from "@/hooks/useProjects";
 import AIStreamingIndicator from "@/components/AIStreamingIndicator";
+import AIContentTab from "@/components/AIContentTab";
 import ScoreRing from "@/components/ScoreRing";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -23,6 +26,10 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer,
+} from "recharts";
+
 
 const TABS = [
   { id: "overview",  label: "Visão Geral",    icon: Layers     },
@@ -191,8 +198,49 @@ const IdeaTab = ({ idea }: { idea: string | null | undefined }) => {
 };
 
 // ── Tab: Prompts ───────────────────────────────────────────────────────────────
+const PROMPT_TYPES_LIST = [
+  { value: "master",        label: "Prompt Mestre" },
+  { value: "frontend",      label: "Frontend" },
+  { value: "backend",       label: "Backend" },
+  { value: "database",      label: "Banco de Dados" },
+  { value: "dashboard",     label: "Dashboard" },
+  { value: "mvp",           label: "MVP" },
+  { value: "premium",       label: "Versão Premium" },
+  { value: "correction",    label: "Correção de Bugs" },
+  { value: "refactoring",   label: "Refatoração" },
+  { value: "multiplatform", label: "Multiplataforma" },
+];
+
 const PromptsTab = ({ projectId }: { projectId: string }) => {
+  const queryClient = useQueryClient();
   const { data: prompts, isLoading } = useProjectPrompts(projectId);
+  const [selectedType, setSelectedType] = useState("master");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showGenerator, setShowGenerator] = useState(false);
+
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-prompt", {
+        body: { project_id: projectId, prompt_type: selectedType },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        if (data.error.includes("429") || data.error.includes("Limite")) toast.error("Limite de requisições atingido.");
+        else if (data.error.includes("402") || data.error.includes("Créditos")) toast.error("Créditos insuficientes.");
+        else toast.error(data.error);
+        return;
+      }
+      toast.success("Prompt gerado e salvo!");
+      queryClient.invalidateQueries({ queryKey: ["prompts", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["all-prompts"] });
+      setShowGenerator(false);
+    } catch (err) {
+      toast.error("Erro ao gerar prompt.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   if (isLoading) return (
     <div className="space-y-3">
@@ -200,37 +248,88 @@ const PromptsTab = ({ projectId }: { projectId: string }) => {
     </div>
   );
 
-  if (!prompts?.length) return (
-    <EmptyTab icon={Zap} title="Nenhum prompt gerado ainda"
-      sub="Acesse o módulo de Prompts para gerar os primeiros prompts deste projeto." />
-  );
-
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-      className="space-y-3">
-      {prompts.map((p) => (
-        <div key={p.id} className="p-4 rounded-xl border border-border bg-card">
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <div>
-              <span className="px-2 py-0.5 rounded-full text-2xs font-medium bg-primary/10 text-primary border border-primary/20 mr-2">
-                {p.type}
-              </span>
-              <span className="text-xs font-semibold text-foreground">{p.title}</span>
+      className="space-y-4">
+
+      {/* Botão gerar prompt */}
+      {!showGenerator ? (
+        <button
+          onClick={() => setShowGenerator(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all active:scale-[0.98]"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Gerar Prompt com IA
+        </button>
+      ) : (
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-3">
+          <h4 className="text-xs font-semibold text-foreground">Selecione o tipo de prompt</h4>
+          <div className="flex flex-wrap gap-2">
+            {PROMPT_TYPES_LIST.map(t => (
+              <button
+                key={t.value}
+                onClick={() => setSelectedType(t.value)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-2xs font-medium border transition-all",
+                  selectedType === t.value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-muted-foreground hover:border-primary/40"
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all disabled:opacity-60"
+            >
+              {isGenerating ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Gerando...</> : <><Bot className="w-3.5 h-3.5" /> Gerar</>}
+            </button>
+            <button
+              onClick={() => setShowGenerator(false)}
+              className="px-4 py-2 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {!prompts?.length ? (
+        <EmptyTab icon={Zap} title="Nenhum prompt gerado ainda"
+          sub="Clique em 'Gerar Prompt com IA' para criar o primeiro prompt deste projeto." />
+      ) : (
+        <div className="space-y-3">
+          {prompts.map((p) => (
+            <div key={p.id} className="p-4 rounded-xl border border-border bg-card">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div>
+                  <span className="px-2 py-0.5 rounded-full text-2xs font-medium bg-primary/10 text-primary border border-primary/20 mr-2">
+                    {p.type}
+                  </span>
+                  <span className="text-xs font-semibold text-foreground">{p.title}</span>
+                </div>
+                {p.content && <CopyButton text={p.content} />}
+              </div>
+              {p.content && (
+                <p className="text-2xs text-muted-foreground line-clamp-3 leading-relaxed font-mono bg-muted/30 rounded-lg p-3">
+                  {p.content}
+                </p>
+              )}
+              <div className="flex items-center gap-3 mt-2 text-2xs text-muted-foreground">
+                <span>v{p.version}</span>
+                {p.tokens_estimate && <span>{p.tokens_estimate} tokens</span>}
+                {p.platform && <span>{p.platform}</span>}
+              </div>
             </div>
-            {p.content && <CopyButton text={p.content} />}
-          </div>
-          {p.content && (
-            <p className="text-2xs text-muted-foreground line-clamp-3 leading-relaxed font-mono bg-muted/30 rounded-lg p-3">
-              {p.content}
-            </p>
-          )}
-          <div className="flex items-center gap-3 mt-2 text-2xs text-muted-foreground">
-            <span>v{p.version}</span>
-            {p.tokens_estimate && <span>{p.tokens_estimate} tokens</span>}
-            {p.platform && <span>{p.platform}</span>}
-          </div>
+          ))}
         </div>
-      ))}
+      )}
+
     </motion.div>
   );
 };
@@ -519,6 +618,177 @@ const AIReviewTab = ({ projectId }: { projectId: string }) => {
   );
 };
 
+// ── Tab: AI Evaluate ─────────────────────────────────────────────────────────
+interface EvalDimension {
+  name: string;
+  score: number;
+  justification: string;
+  recommendations: string[];
+}
+interface EvalResult {
+  dimensions: EvalDimension[];
+  overall_score: number;
+  summary: string;
+  top_priorities: string[];
+}
+
+const EvalTab = ({ projectId, currentScore }: { projectId: string; currentScore: number | null }) => {
+  const queryClient = useQueryClient();
+  const [result, setResult] = useState<EvalResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleEvaluate = async () => {
+    setIsLoading(true);
+    setResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("evaluate-project", {
+        body: { project_id: projectId },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        if (data.error.includes("429") || data.error.includes("Limite")) toast.error("Limite de requisições atingido.");
+        else if (data.error.includes("402") || data.error.includes("Créditos")) toast.error("Créditos insuficientes.");
+        else toast.error(data.error);
+        return;
+      }
+      setResult(data.evaluation);
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("Avaliação concluída! Score salvo no projeto.");
+    } catch (err) {
+      toast.error("Erro ao avaliar projeto.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const radarData = result?.dimensions.map(d => ({ subject: d.name, score: d.score })) ?? [];
+
+  if (!isLoading && !result) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col items-center justify-center py-16 rounded-xl border border-dashed border-border gap-5">
+        <div className="w-14 h-14 rounded-2xl bg-primary/8 border border-primary/15 flex items-center justify-center">
+          <BarChart3 className="w-6 h-6 text-primary/60" />
+        </div>
+        <div className="text-center max-w-sm">
+          <h3 className="text-sm font-semibold text-foreground mb-2">Score de Qualidade</h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Avalie seu projeto em 7 dimensões: Escopo, Estrutura, Técnico, Completude, Viabilidade, Monetização e Maturidade.
+            {currentScore !== null && <span className="block mt-2 text-primary font-medium">Score atual: {currentScore}/100</span>}
+          </p>
+        </div>
+        <button
+          onClick={handleEvaluate}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-[0.98] transition-all shadow-sm"
+        >
+          <BarChart3 className="w-4 h-4" />
+          {currentScore !== null ? "Reavaliar Projeto" : "Calcular Score com IA"}
+        </button>
+      </motion.div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+        <div className="flex items-center justify-center py-10">
+          <AIStreamingIndicator label="IA avaliando projeto em 7 dimensões..." size="md" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[1,2,3,4,5,6,7].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+      className="space-y-5">
+      {/* Score geral */}
+      <div className="p-5 rounded-xl border border-border bg-card flex items-center gap-6">
+        <ScoreRing score={result!.overall_score} size="md" showLabel />
+        <div className="flex-1 min-w-0">
+          <h3 className="text-xs font-semibold text-foreground mb-1">Score Geral</h3>
+          <p className="text-2xs text-muted-foreground leading-relaxed">{result!.summary}</p>
+        </div>
+        <button onClick={handleEvaluate}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:border-primary/40 text-2xs text-muted-foreground hover:text-primary transition-all flex-shrink-0">
+          <RefreshCw className="w-3 h-3" />
+          Reavaliar
+        </button>
+      </div>
+
+      {/* Radar chart */}
+      {radarData.length > 0 && (
+        <div className="p-5 rounded-xl border border-border bg-card">
+          <h4 className="text-xs font-semibold text-foreground mb-4">Mapa de Dimensões</h4>
+          <ResponsiveContainer width="100%" height={220}>
+            <RadarChart data={radarData}>
+              <PolarGrid stroke="hsl(var(--border))" />
+              <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+              <Radar name="Score" dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.2} />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Dimensões detalhadas */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {result!.dimensions.map(dim => (
+          <div key={dim.name} className="p-4 rounded-xl border border-border bg-card">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-foreground">{dim.name}</span>
+              <span className={cn("text-xs font-bold",
+                dim.score >= 80 ? "text-success" : dim.score >= 60 ? "text-primary" : dim.score >= 40 ? "text-warning" : "text-destructive"
+              )}>{dim.score}/100</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-2">
+              <motion.div
+                className={cn("h-full rounded-full",
+                  dim.score >= 80 ? "bg-success" : dim.score >= 60 ? "bg-primary" : dim.score >= 40 ? "bg-warning" : "bg-destructive"
+                )}
+                initial={{ width: 0 }}
+                animate={{ width: `${dim.score}%` }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+              />
+            </div>
+            <p className="text-2xs text-muted-foreground leading-relaxed">{dim.justification}</p>
+            {dim.recommendations.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {dim.recommendations.slice(0, 2).map((rec, i) => (
+                  <li key={i} className="text-2xs text-muted-foreground flex items-start gap-1.5">
+                    <span className="text-primary mt-0.5">›</span>
+                    {rec}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Prioridades */}
+      {result!.top_priorities.length > 0 && (
+        <div className="p-5 rounded-xl border border-primary/20 bg-primary/5">
+          <h4 className="text-xs font-semibold text-foreground mb-3 flex items-center gap-2">
+            <TrendingUp className="w-3.5 h-3.5 text-primary" />
+            Principais Prioridades
+          </h4>
+          <ul className="space-y-2">
+            {result!.top_priorities.map((p, i) => (
+              <li key={i} className="flex items-start gap-2 text-2xs text-foreground">
+                <span className="font-bold text-primary w-4 flex-shrink-0">{i + 1}.</span>
+                {p}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
 // ── Tab: Versions ─────────────────────────────────────────────────────────────
 const VersionsTab = ({ projectId }: { projectId: string }) => {
   const { data: versions, isLoading } = useProjectVersions(projectId);
@@ -559,6 +829,65 @@ const VersionsTab = ({ projectId }: { projectId: string }) => {
         </div>
       ))}
     </motion.div>
+  );
+};
+
+// ── AIContentTabWrapper — estado local por aba ────────────────────────────────
+const AIContentTabWrapper = ({
+  projectId,
+  contentType,
+  icon,
+  title,
+  description,
+}: {
+  projectId: string;
+  contentType: "modules" | "screens" | "database" | "rules";
+  icon: React.ElementType;
+  title: string;
+  description: string;
+}) => {
+  const [content, setContent] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGenerate = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data, err } = await supabase.functions.invoke("generate-ai-content", {
+        body: { project_id: projectId, content_type: contentType },
+      }) as { data: { content?: string; error?: string } | null; err?: unknown };
+      if (err) throw err;
+      if (data?.error) {
+        if (data.error.includes("429") || data.error.includes("Limite")) {
+          setError("Limite de requisições atingido. Aguarde alguns minutos.");
+        } else if (data.error.includes("402") || data.error.includes("Créditos")) {
+          setError("Créditos insuficientes.");
+        } else {
+          setError(data.error);
+        }
+        return;
+      }
+      setContent(data?.content ?? "");
+    } catch {
+      setError("Erro ao gerar conteúdo. Tente novamente.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <AIContentTab
+      contentType={contentType}
+      projectId={projectId}
+      icon={icon}
+      title={title}
+      description={description}
+      onGenerate={handleGenerate}
+      isLoading={isLoading}
+      content={content}
+      error={error}
+    />
   );
 };
 
@@ -751,12 +1080,12 @@ const ProjectDetailPage = () => {
           {activeTab === "idea"      && <IdeaTab idea={project.original_idea} />}
           {activeTab === "prompts"   && <PromptsTab projectId={project.id} />}
           {activeTab === "versions"  && <VersionsTab projectId={project.id} />}
-          {activeTab === "modules"   && <EmptyTab icon={Puzzle}     title="Módulos em construção"   sub="A decomposição em módulos será gerada por IA com base na sua ideia e requisitos." />}
-          {activeTab === "screens"   && <EmptyTab icon={Monitor}    title="Telas em construção"     sub="O mapeamento de telas e jornadas será gerado automaticamente após análise do projeto." />}
-          {activeTab === "database"  && <EmptyTab icon={Database}   title="Banco de dados"          sub="A estrutura de entidades e relacionamentos será gerada após a análise de módulos." />}
-          {activeTab === "rules"     && <EmptyTab icon={ScrollText} title="Regras de negócio"       sub="As regras de negócio serão extraídas e documentadas automaticamente pela IA." />}
-          {activeTab === "exports"   && <EmptyTab icon={Download}   title="Exportações"             sub="Exporte a documentação técnica completa do projeto em diferentes formatos." />}
-          {activeTab === "eval"      && <EmptyTab icon={BarChart3}  title="Avaliação de qualidade"  sub="O score de qualidade será calculado após a análise completa do projeto." />}
+          {activeTab === "modules"   && <AIContentTabWrapper projectId={project.id} contentType="modules" icon={Puzzle} title="Módulos do Sistema" description="A IA decomporá o projeto em módulos bem definidos, com funcionalidades, dependências e complexidade de cada um." />}
+          {activeTab === "screens"   && <AIContentTabWrapper projectId={project.id} contentType="screens" icon={Monitor} title="Mapa de Telas" description="A IA mapeará todas as telas, rotas, elementos de UI e fluxos de usuário do sistema." />}
+          {activeTab === "database"  && <AIContentTabWrapper projectId={project.id} contentType="database" icon={Database} title="Esquema do Banco de Dados" description="A IA gerará o schema SQL completo com tabelas, relacionamentos, índices e RLS policies." />}
+          {activeTab === "rules"     && <AIContentTabWrapper projectId={project.id} contentType="rules" icon={ScrollText} title="Regras de Negócio" description="A IA documentará todas as regras de negócio, validações e fluxos condicionais do sistema." />}
+          {activeTab === "exports"   && <EmptyTab icon={Download} title="Exportações" sub="Exporte a documentação técnica completa do projeto em diferentes formatos." />}
+          {activeTab === "eval"      && <EvalTab projectId={project.id} currentScore={project.quality_score} />}
           {activeTab === "ai"        && <AIReviewTab projectId={project.id} />}
         </div>
       </div>

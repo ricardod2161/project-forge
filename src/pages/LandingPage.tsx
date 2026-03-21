@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
-import { ArrowRight, Sparkles, Zap, BarChart3, BookTemplate, CheckCircle, Star } from "lucide-react";
+import { ArrowRight, Sparkles, Zap, BarChart3, BookTemplate, CheckCircle, Star, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 const features = [
   { icon: Zap, title: "Gerador de Prompts", desc: "10 tipos de prompts prontos para usar em qualquer plataforma de IA." },
@@ -18,7 +19,45 @@ const plans = [
   { name: "Expert", price: "R$ 147/mês", features: ["Tudo do Pro", "Multi-usuário (5 membros)", "White-label do output", "Onboarding personalizado", "SLA de suporte"] },
 ];
 
+const howItWorks = [
+  { step: "01", title: "Descreva sua ideia", desc: "Escreva livremente sobre o sistema que quer construir. A IA refina e expande automaticamente." },
+  { step: "02", title: "IA arquiteta o projeto", desc: "Módulos, telas, banco de dados e regras de negócio são gerados com base no seu nicho e complexidade." },
+  { step: "03", title: "Exporte e construa", desc: "Prompts prontos para Lovable, Bubble ou Bolt. Copie e construa seu sistema em horas." },
+];
+
+const faqs = [
+  { q: "O que é o Arquiteto IA?", a: "É uma plataforma que usa inteligência artificial para transformar ideias de software em arquitetura completa: módulos, telas, banco de dados, regras de negócio e prompts prontos para desenvolvimento." },
+  { q: "Preciso saber programar para usar?", a: "Não. O Arquiteto IA é projetado para fundadores, product managers e empreendedores que querem estruturar sistemas sem conhecimento técnico profundo." },
+  { q: "Os prompts funcionam com qual plataforma?", a: "Os prompts são otimizados para Lovable, mas também funcionam com Bolt, Bubble, Cursor, GPT-4, Claude e qualquer ferramenta que aceite instruções de texto." },
+  { q: "Posso exportar a documentação?", a: "Sim. No plano Pro e Expert você pode exportar toda a arquitetura em texto estruturado, Markdown ou JSON para usar em qualquer ferramenta." },
+  { q: "Como funciona o Score de Qualidade?", a: "A IA avalia o projeto em 7 dimensões (Escopo, Estrutura, Técnico, Completude, Viabilidade, Monetização e Maturidade) e retorna um score de 0 a 100 com recomendações de melhoria." },
+];
+
+const FAQItem = ({ q, a }: { q: string; a: string }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border border-border rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between p-5 text-left hover:bg-surface/50 transition-colors"
+      >
+        <span className="text-sm font-medium text-foreground pr-4">{q}</span>
+        <ChevronDown className={cn("w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform duration-200", open && "rotate-180")} />
+      </button>
+      <motion.div
+        initial={false}
+        animate={{ height: open ? "auto" : 0, opacity: open ? 1 : 0 }}
+        transition={{ duration: 0.2 }}
+        className="overflow-hidden"
+      >
+        <p className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed">{a}</p>
+      </motion.div>
+    </div>
+  );
+};
+
 const LandingPage = () => {
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-hidden">
       {/* Header */}
@@ -123,6 +162,31 @@ const LandingPage = () => {
               Ver funcionalidades
             </a>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Como Funciona */}
+      <section className="py-24 px-6 bg-surface/30">
+        <div className="container max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="font-display font-bold text-xl md:text-2xl mb-4">
+              Como funciona em <span className="text-gradient">3 passos</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {howItWorks.map((step, i) => (
+              <motion.div key={step.step} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: i * 0.15 }} viewport={{ once: true }}
+                className="flex flex-col items-center text-center">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 shadow-glow">
+                  <span className="font-display font-bold text-primary text-lg">{step.step}</span>
+                </div>
+                {i < 2 && <div className="hidden md:block absolute mt-7 ml-48 w-16 h-px bg-border" />}
+                <h3 className="font-display font-semibold text-sm mb-2">{step.title}</h3>
+                <p className="text-muted-foreground text-xs leading-relaxed">{step.desc}</p>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 

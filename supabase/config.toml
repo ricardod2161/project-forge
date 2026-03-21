@@ -2,3 +2,16 @@ project_id = "qxycgbqznudjamcofqla"
 
 [functions.review-project]
 verify_jwt = false
+
+[functions.generate-prompt]
+verify_jwt = false
+
+[functions.refine-idea]
+verify_jwt = false
+
+[functions.generate-ai-content]
+verify_jwt = false
+
+[functions.evaluate-project]
+verify_jwt = false
+

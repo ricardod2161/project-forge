@@ -1,10 +1,12 @@
 import { useState, KeyboardEvent } from "react";
-import { ArrowLeft, Sparkles, X, Check, Plus } from "lucide-react";
+import { ArrowLeft, Sparkles, X, Check, Plus, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useProjectWizard } from "@/hooks/useProjectWizard";
 import { useCreateProject } from "@/hooks/useProjects";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -45,6 +47,39 @@ const INTEGRATIONS_LIST = [
 
 const StepIdeia = () => {
   const { idea, setIdea, nextStep } = useProjectWizard();
+  const [isRefining, setIsRefining] = useState(false);
+
+  const handleRefineWithAI = async () => {
+    if (idea.trim().length < 20) {
+      toast.error("Escreva pelo menos 20 caracteres antes de refinar.");
+      return;
+    }
+    setIsRefining(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("refine-idea", {
+        body: { idea },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        if (data.error.includes("429") || data.error.includes("Limite")) {
+          toast.error("Limite de requisições atingido. Aguarde alguns minutos.");
+        } else if (data.error.includes("402") || data.error.includes("Créditos")) {
+          toast.error("Créditos insuficientes. Acesse Configurações → Uso.");
+        } else {
+          toast.error(data.error);
+        }
+        return;
+      }
+      if (data?.refined) {
+        setIdea(data.refined);
+        toast.success("Ideia refinada com sucesso!");
+      }
+    } catch (err) {
+      toast.error("Erro ao refinar ideia. Tente novamente.");
+    } finally {
+      setIsRefining(false);
+    }
+  };
 
   return (
     <div className="p-8 rounded-xl border border-border bg-card space-y-5">
@@ -68,12 +103,20 @@ const StepIdeia = () => {
         </span>
       </div>
       <div className="flex items-center justify-between">
-        <button className={cn(
-          "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium",
-          "border border-primary/40 text-primary hover:bg-primary/10 transition-all"
-        )}>
-          <Sparkles className="w-3.5 h-3.5" />
-          Refinar com IA
+        <button
+          onClick={handleRefineWithAI}
+          disabled={isRefining || idea.trim().length < 20}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all",
+            "border border-primary/40 text-primary hover:bg-primary/10",
+            "disabled:opacity-50 disabled:cursor-not-allowed"
+          )}
+        >
+          {isRefining ? (
+            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Refinando...</>
+          ) : (
+            <><Sparkles className="w-3.5 h-3.5" /> Refinar com IA</>
+          )}
         </button>
         <button
           onClick={nextStep}
