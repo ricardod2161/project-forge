@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import CommandPalette from "@/components/CommandPalette";
 
 const AppHeader = () => {
   const { user, signOut } = useAuth();
