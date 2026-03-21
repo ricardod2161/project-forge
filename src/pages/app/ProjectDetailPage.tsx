@@ -2172,7 +2172,7 @@ const ProjectDetailPage = () => {
                 onResultCached={setEvalResultCache}
               />
             )}
-            {activeTab === "ai"        && <AIReviewTab projectId={project.id} />}
+            {activeTab === "ai"        && <AIReviewTab projectId={project.id} onProjectUpdate={(updates) => updateProject.mutate({ ...updates, _silent: true } as never)} />}
           </motion.div>
         </AnimatePresence>
       </div>
