@@ -832,6 +832,65 @@ const VersionsTab = ({ projectId }: { projectId: string }) => {
   );
 };
 
+// ── AIContentTabWrapper — estado local por aba ────────────────────────────────
+const AIContentTabWrapper = ({
+  projectId,
+  contentType,
+  icon,
+  title,
+  description,
+}: {
+  projectId: string;
+  contentType: "modules" | "screens" | "database" | "rules";
+  icon: React.ElementType;
+  title: string;
+  description: string;
+}) => {
+  const [content, setContent] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGenerate = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data, err } = await supabase.functions.invoke("generate-ai-content", {
+        body: { project_id: projectId, content_type: contentType },
+      }) as { data: { content?: string; error?: string } | null; err?: unknown };
+      if (err) throw err;
+      if (data?.error) {
+        if (data.error.includes("429") || data.error.includes("Limite")) {
+          setError("Limite de requisições atingido. Aguarde alguns minutos.");
+        } else if (data.error.includes("402") || data.error.includes("Créditos")) {
+          setError("Créditos insuficientes.");
+        } else {
+          setError(data.error);
+        }
+        return;
+      }
+      setContent(data?.content ?? "");
+    } catch {
+      setError("Erro ao gerar conteúdo. Tente novamente.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <AIContentTab
+      contentType={contentType}
+      projectId={projectId}
+      icon={icon}
+      title={title}
+      description={description}
+      onGenerate={handleGenerate}
+      isLoading={isLoading}
+      content={content}
+      error={error}
+    />
+  );
+};
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 const ProjectDetailPage = () => {
   const { id } = useParams<{ id: string }>();
