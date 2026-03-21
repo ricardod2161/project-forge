@@ -73,7 +73,7 @@ Listar cada módulo com: nome, responsabilidade em 1 frase, quais páginas/rotas
 
 ## 6. REGRAS DE IMPLEMENTAÇÃO (críticas e verificáveis)
 REGRAS TYPESCRIPT:
-- Nunca usar `any` — tipos específicos ou `unknown` com narrowing
+- Nunca usar 'any' — tipos específicos ou 'unknown' com narrowing
 - Tipar responses Supabase: Database['public']['Tables']['tabela']['Row']
 - Interfaces para objetos, type para unions e primitivos
 
@@ -751,7 +751,7 @@ CUSTOM HOOKS:
 - useDebounce: para inputs de busca
 
 TYPESCRIPT STRICTNESS:
-- Eliminar todos os `any` → tipos específicos ou unknown
+- Eliminar todos os 'any' → tipos específicos ou unknown
 - Tipar responses Supabase: Database['public']['Tables'][tabela]['Row']
 - Zod schemas exportados e reutilizados entre frontend e backend
 
