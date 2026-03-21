@@ -30,53 +30,58 @@ export interface ScreensWithMockupsProps {
   initialMockups?: Record<string, string>;
   /** called whenever a new mockup is generated, for persistence */
   onMockupSaved?: (screenName: string, url: string) => void;
+  /** project platform for aspect ratio detection */
+  projectPlatform?: string;
 }
 
-// ── Robust screen parser ───────────────────────────────────────────────────────
+// ── Robust screen parser — collects up to 800 chars of full description ────────
 // Handles: ## Tela: X / ## Tela X: / ### Tela: / ## Screen: / ## 1. Tela / ## Tela 1 - X
+// Also handles generic headers that are likely screen names in context
 export function parseScreens(markdown: string): Array<{ name: string; description: string }> {
   const screens: Array<{ name: string; description: string }> = [];
   const lines = markdown.split("\n");
-  let currentScreen: { name: string; description: string } | null = null;
-  const descLines: string[] = [];
+  let currentScreen: { name: string; descLines: string[] } | null = null;
 
   const SCREEN_PATTERNS = [
-    /^#{2,3}\s+Tela\s*[:–-]\s*(.+)$/i,           // ## Tela: X  /  ## Tela - X
-    /^#{2,3}\s+Tela\s+\d+\s*[:–-]\s*(.+)$/i,    // ## Tela 1: X
-    /^#{2,3}\s+\d+\.\s+(.+(?:tela|screen|page|página).*)$/i, // ## 1. Login Screen
-    /^#{2,3}\s+Screen\s*[:–-]\s*(.+)$/i,          // ## Screen: X
-    /^#{2,3}\s+Página\s*[:–-]\s*(.+)$/i,          // ## Página: X
-    /^#{2,3}\s+(.+)\s+(?:Screen|Tela|Page|Página)$/i, // ## Login Screen
+    /^#{2,3}\s+Tela\s*[:–-]\s*(.+)$/i,                       // ## Tela: X  /  ## Tela - X
+    /^#{2,3}\s+Tela\s+\d+\s*[:–-]\s*(.+)$/i,                // ## Tela 1: X
+    /^#{2,3}\s+\d+[\.\)]\s+(.+(?:tela|screen|page|página|login|dashboard|painel|lista|detalhe|formulário|form|perfil|configuração|chat|notifica|onboard|cadastro|busca|search).*)$/i, // ## 1. Login Screen
+    /^#{2,3}\s+Screen\s*[:–-]\s*(.+)$/i,                      // ## Screen: X
+    /^#{2,3}\s+Página\s*[:–-]\s*(.+)$/i,                      // ## Página: X
+    /^#{2,3}\s+(.+)\s+(?:Screen|Tela|Page|Página)$/i,         // ## Login Screen
+    /^#{2,3}\s+(?:\d+[\.\)]\s+)?(\w[^#\n]{2,40})$/i,          // ## Dashboard / ## Login / ## Cadastro (generic short h2/h3)
   ];
+
+  const pushCurrent = () => {
+    if (!currentScreen) return;
+    const description = currentScreen.descLines
+      .join(" ")
+      .trim()
+      .slice(0, 800); // ← 800 chars (was 400) for richer AI context
+    screens.push({ name: currentScreen.name, description });
+  };
 
   for (const line of lines) {
     let matched = false;
     for (const pattern of SCREEN_PATTERNS) {
       const m = line.match(pattern);
       if (m) {
-        if (currentScreen) {
-          currentScreen.description = descLines.join(" ").trim().slice(0, 400);
-          screens.push(currentScreen);
-          descLines.length = 0;
-        }
-        currentScreen = { name: m[1].trim(), description: "" };
+        pushCurrent();
+        currentScreen = { name: m[1].trim(), descLines: [] };
         matched = true;
         break;
       }
     }
     if (!matched && currentScreen && line.trim() && !line.startsWith("#") && !line.startsWith("---")) {
-      // Collect first 4 non-header, non-bullet lines as description
-      if (descLines.length < 4) {
-        descLines.push(line.replace(/^[-*•]\s*/, "").trim());
+      // Collect ALL non-header lines (up to 800 chars when joined)
+      const joined = currentScreen.descLines.join(" ");
+      if (joined.length < 800) {
+        currentScreen.descLines.push(line.replace(/^[-*•]\s*/, "").trim());
       }
     }
   }
 
-  if (currentScreen) {
-    currentScreen.description = descLines.join(" ").trim().slice(0, 400);
-    screens.push(currentScreen);
-  }
-
+  pushCurrent();
   return screens.slice(0, 10); // max 10 screens
 }
 
