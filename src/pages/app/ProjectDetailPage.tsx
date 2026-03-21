@@ -1379,6 +1379,9 @@ const ProjectDetailPage = () => {
   );
 
   const statusInfo = statusConfig[project.status as keyof typeof statusConfig] ?? statusConfig.draft;
+  const projectMeta = (project.metadata as Record<string, unknown>) ?? {};
+  const isWebsite = projectMeta.mode === "website";
+  const TABS = isWebsite ? WEBSITE_TABS : SYSTEM_TABS;
 
   return (
     <>
