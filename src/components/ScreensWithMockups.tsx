@@ -524,7 +524,6 @@ const ScreensWithMockups = ({
   const isMobilePlatform = ["mobile", "ios", "android", "react native", "flutter"].some(
     k => (projectPlatform ?? "").toLowerCase().includes(k)
   );
-  const abortRef = useRef(false);
 
   const handleCopy = async () => {
     if (!persistedContent) return;
