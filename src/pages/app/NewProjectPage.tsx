@@ -927,9 +927,15 @@ const StepConfirmacao = () => {
     return () => clearInterval(interval);
   }, [isPending]);
 
-  const derivedTitle = title || `${niche ? niche + " — " : ""}${
-    PROJECT_TYPES.find((t) => t.value === type)?.label ?? "Projeto"
-  }`;
+  // BUG 7 FIX: avoid redundant title like "Agência — Agência / Freela"
+  // Only prepend niche if it's meaningfully different from the type label
+  const typeLabel930 = PROJECT_TYPES.find((t) => t.value === type)?.label ?? "Projeto";
+  const nicheNorm = (niche ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const typeNorm = typeLabel930.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const nichePrefix = niche && !nicheNorm.startsWith(typeNorm) && !typeNorm.startsWith(nicheNorm)
+    ? `${niche} — `
+    : "";
+  const derivedTitle = title || `${nichePrefix}${typeLabel930}`;
 
   const handleCreate = () => {
     createProject(
@@ -1062,7 +1068,13 @@ const StepConfirmacaoSite = () => {
 
   const typeLabel = WEBSITE_TYPES.find(t => t.value === type)?.label ?? type;
   const styleLabel = WEBSITE_STYLES.find(s => s.value === websiteStyle)?.label ?? websiteStyle;
-  const derivedTitle = title || `${niche ? niche + " — " : ""}${typeLabel || "Site"}`;
+  // BUG 7 FIX: avoid redundant title when niche matches type (e.g. "Agência — Agência / Freela")
+  const nicheNormW = (niche ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const typeNormW = (typeLabel || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const nichePrefixW = niche && !nicheNormW.startsWith(typeNormW) && !typeNormW.startsWith(nicheNormW)
+    ? `${niche} — `
+    : "";
+  const derivedTitle = title || `${nichePrefixW}${typeLabel || "Site"}`;
 
   const handleCreate = () => {
     createProject(

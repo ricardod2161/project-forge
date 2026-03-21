@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -16,7 +16,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useProjectDetail, useProjectPrompts, useProjectVersions, useUpdateProject, useDeleteProject } from "@/hooks/useProjectDetail";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useToggleFavorite, type Project } from "@/hooks/useProjects";
+import { useToggleFavorite, useDuplicateProject, type Project } from "@/hooks/useProjects";
 import AIStreamingIndicator from "@/components/AIStreamingIndicator";
 import AIContentTab from "@/components/AIContentTab";
 import ScreensWithMockups from "@/components/ScreensWithMockups";
@@ -370,6 +370,12 @@ const PromptsTab = ({ projectId, isWebsite }: { projectId: string; isWebsite: bo
   const [generatingTypes, setGeneratingTypes] = useState<Set<string>>(new Set());
   const [selectedVersions, setSelectedVersions] = useState<Record<string, number>>({});
   const [focusPrompt, setFocusPrompt] = useState<{ title: string; content: string } | null>(null);
+
+  // BUG 2 FIX: sync selectedType when isWebsite changes (e.g. navigating between projects)
+  useEffect(() => {
+    setSelectedType(isWebsite ? "site_master" : "master");
+    setSelectedVersions({});
+  }, [isWebsite]);
 
   // Group prompts by type, sorted by version DESC
   const promptsByType = useMemo(() => {
@@ -1110,7 +1116,10 @@ const VersionsTab = ({ projectId }: { projectId: string }) => {
   const handleCreateVersion = async () => {
     setIsCreating(true);
     try {
-      const nextVersion = (versions?.length ?? 0) + 1;
+      // BUG 8 FIX: use max version_number to handle gaps from deletions
+      const nextVersion = versions && versions.length > 0
+        ? Math.max(...versions.map(v => v.version_number)) + 1
+        : 1;
       const { error } = await supabase
         .from("project_versions")
         .insert({
@@ -1235,7 +1244,7 @@ const AIContentTabWrapper = ({
   onContentGenerated,
 }: {
   projectId: string;
-  contentType: "modules" | "database" | "rules" | "site_pages" | "site_copy" | "site_seo" | "site_structure";
+  contentType: "modules" | "screens" | "database" | "rules" | "site_pages" | "site_copy" | "site_seo" | "site_structure";
   icon: React.ElementType;
   title: string;
   description: string;
@@ -1589,6 +1598,7 @@ const ProjectDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const contentRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -1602,6 +1612,8 @@ const ProjectDetailPage = () => {
   const toggleFavorite = useToggleFavorite();
   const updateProject = useUpdateProject(id);
   const deleteProject = useDeleteProject();
+  // BUG 1 FIX: use the shared hook with proper slugify + cache invalidation
+  const duplicateProject = useDuplicateProject();
 
   // Hydrate cache from persisted metadata on first load
   useEffect(() => {
@@ -1615,9 +1627,14 @@ const ProjectDetailPage = () => {
     }
   }, [project, cacheInitialized]);
 
-  // Scroll to top on tab change
+  // UX FIX: scroll the AppLayout main container (not window) to top on tab change
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const mainEl = document.querySelector("main");
+    if (mainEl) {
+      mainEl.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }, [activeTab]);
 
   // When AI generates content: update in-memory cache AND persist to project.metadata
@@ -1653,32 +1670,10 @@ const ProjectDetailPage = () => {
     });
   };
 
-  const handleDuplicate = async () => {
+  // BUG 1 FIX: delegate to useDuplicateProject hook (uses slugify, invalidates queries correctly)
+  const handleDuplicate = () => {
     if (!project) return;
-    const { data, error: dupError } = await supabase
-      .from("projects")
-      .insert([{
-        user_id: project.user_id,
-        title: `${project.title} (Cópia)`,
-        slug: `${project.slug ?? project.id}-copia-${Date.now()}`,
-        original_idea: project.original_idea,
-        type: project.type,
-        niche: project.niche,
-        complexity: project.complexity,
-        platform: project.platform,
-        audience: project.audience,
-        features: project.features ?? [],
-        monetization: project.monetization,
-        integrations: project.integrations ?? [],
-        metadata: project.metadata as never,
-        status: "draft" as const,
-      }])
-      .select()
-      .single();
-    if (dupError) { toast.error("Erro ao duplicar projeto."); return; }
-    toast.success("Projeto duplicado!");
-    queryClient.invalidateQueries({ queryKey: ["projects"] });
-    navigate(`/app/projetos/${data.id}`);
+    duplicateProject.mutate(project.id);
   };
 
   const handleShare = async () => {
@@ -1753,7 +1748,7 @@ const ProjectDetailPage = () => {
     structure:      !!aiContentCache["site_structure"],
     prompts:        (prompts?.length ?? 0) > 0,
     eval:           project.quality_score !== null,
-    versions:       true,
+    versions:       false,   // BUG 4 FIX: versions query lives in VersionsTab, default to false to avoid misleading dot
     exports:        true,
     ai:             false,
   };
