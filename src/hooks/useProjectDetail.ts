@@ -157,6 +157,24 @@ export function useAllVersions() {
   });
 }
 
+export function useDeletePrompt() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("prompts").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-prompts"] });
+      queryClient.invalidateQueries({ queryKey: ["prompts"] });
+      toast.success("Prompt excluído.");
+    },
+    onError: (error: Error) => {
+      toast.error(`Erro ao excluir: ${error.message}`);
+    },
+  });
+}
+
 export function useTemplates() {
   return useQuery({
     queryKey: ["templates"],
