@@ -1073,7 +1073,7 @@ const ProjectDetailPage = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
-  // In-memory cache for tab switching (initialized from project.metadata on load)
+  // In-memory cache for tab switching (hydrated from project.metadata.ai_content on first load)
   const [aiContentCache, setAiContentCache] = useState<Record<string, string | null>>({});
   const [cacheInitialized, setCacheInitialized] = useState(false);
 
@@ -1081,6 +1081,34 @@ const ProjectDetailPage = () => {
   const toggleFavorite = useToggleFavorite();
   const updateProject = useUpdateProject(id);
   const deleteProject = useDeleteProject();
+
+  // Hydrate cache from persisted metadata on first load
+  useEffect(() => {
+    if (project && !cacheInitialized) {
+      const meta = (project.metadata as Record<string, unknown>) ?? {};
+      const saved = (meta.ai_content ?? {}) as Record<string, string>;
+      if (Object.keys(saved).length > 0) {
+        setAiContentCache(saved);
+      }
+      setCacheInitialized(true);
+    }
+  }, [project, cacheInitialized]);
+
+  // When AI generates content: update in-memory cache AND persist to project.metadata
+  const handleContentGenerated = useCallback((contentType: string, content: string) => {
+    setAiContentCache(prev => ({ ...prev, [contentType]: content }));
+    // Persist to DB: merge into metadata.ai_content
+    if (project) {
+      const currentMeta = (project.metadata as Record<string, unknown>) ?? {};
+      const currentAI = (currentMeta.ai_content ?? {}) as Record<string, string>;
+      updateProject.mutate({
+        metadata: {
+          ...currentMeta,
+          ai_content: { ...currentAI, [contentType]: content },
+        } as never,
+      });
+    }
+  }, [project, updateProject]);
 
   const handleStatusChange = (status: "draft" | "active" | "archived") => {
     updateProject.mutate({ status });
