@@ -656,6 +656,11 @@ interface Finding {
   recommendation: string;
 }
 
+interface FindingWithStatus extends Finding {
+  status: "pending" | "applying" | "applied" | "dismissed";
+  appliedFields?: string[];
+}
+
 const severityConfig = {
   critico: {
     label: "Crítico",
@@ -685,8 +690,14 @@ const categoryConfig = {
 } as const;
 
 // ── Tab: AI Review ────────────────────────────────────────────────────────────
-const AIReviewTab = ({ projectId }: { projectId: string }) => {
-  const [findings, setFindings] = useState<Finding[] | null>(null);
+const AIReviewTab = ({
+  projectId,
+  onProjectUpdate,
+}: {
+  projectId: string;
+  onProjectUpdate: (updates: Record<string, unknown>) => void;
+}) => {
+  const [findings, setFindings] = useState<FindingWithStatus[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeSeverity, setActiveSeverity] = useState<Finding["severity"] | "all">("all");
 
@@ -706,7 +717,8 @@ const AIReviewTab = ({ projectId }: { projectId: string }) => {
         }
         return;
       }
-      setFindings(data.findings ?? []);
+      const raw: Finding[] = data.findings ?? [];
+      setFindings(raw.map(f => ({ ...f, status: "pending" as const })));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao executar revisão";
       if (msg.includes("rate") || msg.includes("429")) {
@@ -719,19 +731,88 @@ const AIReviewTab = ({ projectId }: { projectId: string }) => {
     }
   }, [projectId]);
 
+  const handleApply = useCallback(async (index: number) => {
+    if (!findings) return;
+    const finding = findings[index];
+
+    setFindings(prev => prev
+      ? prev.map((f, i) => i === index ? { ...f, status: "applying" } : f)
+      : prev
+    );
+
+    try {
+      const { data, error } = await supabase.functions.invoke("apply-finding", {
+        body: { project_id: projectId, finding },
+      });
+
+      if (error) throw error;
+      if (data?.error) {
+        toast.error(data.error);
+        setFindings(prev => prev
+          ? prev.map((f, i) => i === index ? { ...f, status: "pending" } : f)
+          : prev
+        );
+        return;
+      }
+
+      const updates = data.updates as Record<string, unknown>;
+      const fields: string[] = data.fields ?? [];
+
+      onProjectUpdate(updates);
+
+      setFindings(prev => prev
+        ? prev.map((f, i) => i === index ? { ...f, status: "applied", appliedFields: fields } : f)
+        : prev
+      );
+
+      const fieldNames: Record<string, string> = {
+        description: "Descrição",
+        audience: "Público-alvo",
+        monetization: "Monetização",
+        platform: "Plataforma",
+        complexity: "Complexidade",
+        features: "Funcionalidades",
+        integrations: "Integrações",
+      };
+      const readableFields = fields.map(f => fieldNames[f] ?? f).join(", ");
+      toast.success(`Melhoria aplicada! ${readableFields ? `Campos atualizados: ${readableFields}` : ""}`, { duration: 4000 });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao aplicar melhoria";
+      toast.error(msg.includes("429") ? "Limite de requisições atingido." : msg);
+      setFindings(prev => prev
+        ? prev.map((f, i) => i === index ? { ...f, status: "pending" } : f)
+        : prev
+      );
+    }
+  }, [findings, projectId, onProjectUpdate]);
+
+  const handleDismiss = useCallback((index: number) => {
+    setFindings(prev => prev
+      ? prev.map((f, i) => i === index ? { ...f, status: "dismissed" } : f)
+      : prev
+    );
+  }, []);
+
   const filtered = findings
-    ? activeSeverity === "all"
-      ? findings
-      : findings.filter((f) => f.severity === activeSeverity)
+    ? (activeSeverity === "all"
+        ? findings
+        : findings.filter((f) => f.severity === activeSeverity))
     : [];
 
   const counts = findings
     ? {
-        critico: findings.filter((f) => f.severity === "critico").length,
+        critico:   findings.filter((f) => f.severity === "critico").length,
         importante: findings.filter((f) => f.severity === "importante").length,
-        sugestao: findings.filter((f) => f.severity === "sugestao").length,
+        sugestao:  findings.filter((f) => f.severity === "sugestao").length,
       }
     : null;
+
+  const resolvedCount = findings
+    ? findings.filter(f => f.status === "applied" || f.status === "dismissed").length
+    : 0;
+  const totalCount = findings?.length ?? 0;
+  const allResolved = totalCount > 0 && resolvedCount === totalCount;
+  const resolutionPercent = totalCount > 0 ? Math.round((resolvedCount / totalCount) * 100) : 0;
 
   if (!isLoading && !findings) {
     return (
@@ -801,39 +882,67 @@ const AIReviewTab = ({ projectId }: { projectId: string }) => {
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-4">
       {/* Summary bar */}
-      <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-border bg-card">
-        <div className="flex items-center gap-4 flex-wrap">
-          {counts && (
-            <>
-              <span className="text-2xs font-medium text-muted-foreground">{findings!.length} achados</span>
-              {counts.critico > 0 && (
-                <span className="flex items-center gap-1 text-2xs font-semibold text-destructive">
-                  <ShieldAlert className="w-3 h-3" />
-                  {counts.critico} crítico{counts.critico !== 1 ? "s" : ""}
-                </span>
-              )}
-              {counts.importante > 0 && (
-                <span className="flex items-center gap-1 text-2xs font-semibold text-warning">
-                  <AlertTriangle className="w-3 h-3" />
-                  {counts.importante} importante{counts.importante !== 1 ? "s" : ""}
-                </span>
-              )}
-              {counts.sugestao > 0 && (
-                <span className="flex items-center gap-1 text-2xs font-semibold text-success">
-                  <LightbulbIcon className="w-3 h-3" />
-                  {counts.sugestao} sugestão{counts.sugestao !== 1 ? "ões" : ""}
-                </span>
-              )}
-            </>
-          )}
+      <div className="p-4 rounded-xl border border-border bg-card space-y-3">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4 flex-wrap">
+            {counts && (
+              <>
+                <span className="text-2xs font-medium text-muted-foreground">{totalCount} achados</span>
+                {counts.critico > 0 && (
+                  <span className="flex items-center gap-1 text-2xs font-semibold text-destructive">
+                    <ShieldAlert className="w-3 h-3" />
+                    {counts.critico} crítico{counts.critico !== 1 ? "s" : ""}
+                  </span>
+                )}
+                {counts.importante > 0 && (
+                  <span className="flex items-center gap-1 text-2xs font-semibold text-warning">
+                    <AlertTriangle className="w-3 h-3" />
+                    {counts.importante} importante{counts.importante !== 1 ? "s" : ""}
+                  </span>
+                )}
+                {counts.sugestao > 0 && (
+                  <span className="flex items-center gap-1 text-2xs font-semibold text-success">
+                    <LightbulbIcon className="w-3 h-3" />
+                    {counts.sugestao} sugestão{counts.sugestao !== 1 ? "ões" : ""}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {allResolved ? (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success/10 border border-success/30 text-success text-2xs font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Tudo revisado ✓
+              </span>
+            ) : (
+              <span className="text-2xs text-muted-foreground font-medium">
+                {resolvedCount} de {totalCount} resolvidos
+              </span>
+            )}
+            <button
+              onClick={runReview}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 hover:text-primary text-2xs font-medium text-muted-foreground transition-all duration-150"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Reanalisar
+            </button>
+          </div>
         </div>
-        <button
-          onClick={runReview}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 hover:text-primary text-2xs font-medium text-muted-foreground transition-all duration-150"
-        >
-          <RefreshCw className="w-3 h-3" />
-          Reanalisar
-        </button>
+
+        {/* Progress bar */}
+        {totalCount > 0 && (
+          <div className="space-y-1">
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+              <motion.div
+                className={cn("h-full rounded-full transition-colors", allResolved ? "bg-success" : "bg-primary")}
+                initial={{ width: 0 }}
+                animate={{ width: `${resolutionPercent}%` }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Severity filter chips */}
@@ -841,7 +950,7 @@ const AIReviewTab = ({ projectId }: { projectId: string }) => {
         {(["all", "critico", "importante", "sugestao"] as const).map((s) => {
           const isAll = s === "all";
           const cfg = !isAll ? severityConfig[s] : null;
-          const count = !isAll && counts ? counts[s] : findings?.length ?? 0;
+          const count = !isAll && counts ? counts[s] : totalCount;
           return (
             <button
               key={s}
@@ -872,40 +981,102 @@ const AIReviewTab = ({ projectId }: { projectId: string }) => {
       <AnimatePresence mode="popLayout">
         <div className="space-y-3">
           {filtered.map((finding, index) => {
+            const originalIndex = findings!.indexOf(finding);
             const sev = severityConfig[finding.severity];
             const cat = categoryConfig[finding.category];
             const SevIcon = sev.icon;
+            const isApplied = finding.status === "applied";
+            const isDismissed = finding.status === "dismissed";
+            const isApplying = finding.status === "applying";
+            const isResolved = isApplied || isDismissed;
+
             return (
               <motion.div
-                key={`${finding.title}-${index}`}
+                key={`${finding.title}-${originalIndex}`}
                 initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
+                animate={{ opacity: isResolved ? 0.55 : 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.97, y: -4 }}
                 transition={{ duration: 0.2, delay: index * 0.04 }}
-                className="p-4 rounded-xl border border-border bg-card hover:border-border/80 transition-colors"
+                className={cn(
+                  "p-4 rounded-xl border bg-card transition-colors",
+                  isApplied && "border-success/30 bg-success/3",
+                  isDismissed && "border-border/50",
+                  !isResolved && "border-border hover:border-border/80",
+                )}
               >
                 <div className="flex items-start gap-3">
-                  <div className={cn("w-8 h-8 rounded-lg border flex items-center justify-center flex-shrink-0 mt-0.5", sev.classes)}>
-                    <SevIcon className="w-3.5 h-3.5" />
+                  <div className={cn(
+                    "w-8 h-8 rounded-lg border flex items-center justify-center flex-shrink-0 mt-0.5 transition-all",
+                    isApplied ? "bg-success/10 border-success/30 text-success" : sev.classes
+                  )}>
+                    {isApplied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <SevIcon className="w-3.5 h-3.5" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                      <span className={cn("px-2 py-0.5 rounded-full text-2xs font-semibold border", sev.classes)}>
-                        {sev.label}
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-full text-2xs font-semibold border",
+                        isApplied ? "bg-success/10 text-success border-success/30" : sev.classes
+                      )}>
+                        {isApplied ? "Aplicado" : isDismissed ? "Dispensado" : sev.label}
                       </span>
                       <span className={cn("px-2 py-0.5 rounded-full text-2xs font-medium border", cat.classes)}>
                         {cat.label}
                       </span>
+                      {isApplied && finding.appliedFields && finding.appliedFields.length > 0 && (
+                        <span className="text-2xs text-success font-medium">
+                          → {finding.appliedFields.join(", ")}
+                        </span>
+                      )}
                     </div>
-                    <h4 className="text-xs font-semibold text-foreground mb-1">{finding.title}</h4>
-                    <p className="text-2xs text-muted-foreground leading-relaxed mb-3">{finding.description}</p>
-                    <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/10">
-                      <AlertCircle className="w-3 h-3 text-primary flex-shrink-0 mt-0.5" />
-                      <p className="text-2xs text-foreground leading-relaxed">
-                        <span className="font-semibold text-primary">Recomendação: </span>
-                        {finding.recommendation}
-                      </p>
-                    </div>
+                    <h4 className={cn(
+                      "text-xs font-semibold mb-1 transition-colors",
+                      isDismissed ? "text-muted-foreground line-through" : "text-foreground"
+                    )}>
+                      {finding.title}
+                    </h4>
+                    {!isResolved && (
+                      <>
+                        <p className="text-2xs text-muted-foreground leading-relaxed mb-3">{finding.description}</p>
+                        <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/10 mb-3">
+                          <AlertCircle className="w-3 h-3 text-primary flex-shrink-0 mt-0.5" />
+                          <p className="text-2xs text-foreground leading-relaxed">
+                            <span className="font-semibold text-primary">Recomendação: </span>
+                            {finding.recommendation}
+                          </p>
+                        </div>
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleApply(originalIndex)}
+                            disabled={isApplying}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-2xs font-semibold hover:bg-primary/90 active:scale-[0.98] transition-all disabled:opacity-60 disabled:pointer-events-none shadow-sm"
+                          >
+                            {isApplying ? (
+                              <>
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Aplicando...
+                              </>
+                            ) : (
+                              <>
+                                <Wand2 className="w-3 h-3" />
+                                Aplicar melhoria
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleDismiss(originalIndex)}
+                            disabled={isApplying}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-muted-foreground text-2xs font-medium hover:border-border/80 hover:text-foreground active:scale-[0.98] transition-all disabled:opacity-60 disabled:pointer-events-none"
+                          >
+                            <X className="w-3 h-3" />
+                            Dispensar
+                          </button>
+                        </div>
+                      </>
+                    )}
+                    {isDismissed && (
+                      <p className="text-2xs text-muted-foreground mt-1">Dispensado — não será aplicado ao projeto.</p>
+                    )}
                   </div>
                 </div>
               </motion.div>
