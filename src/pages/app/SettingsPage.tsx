@@ -627,6 +627,7 @@ const SettingsPage = () => (
         <div className="space-y-5">
           <AppearanceSection />
           <AIPreferencesSection />
+          <AIProvidersSection />
           <NotificationsSection />
           <PlanSection />
         </div>
