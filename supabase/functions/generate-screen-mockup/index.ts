@@ -166,21 +166,29 @@ serve(async (req) => {
     const componentHints = getComponentHints(screen_name, isMobile);
     const navHints = getNavHints(isMobile, effectivePlatform);
 
-    // ── ULTRA-REALISTIC HIERARCHICAL PROMPT ──────────────────────────────────────
-    const imagePrompt = `CRITICAL INSTRUCTION: You must generate a PHOTOREALISTIC, HIGH-FIDELITY SCREENSHOT of a real, production-ready software application. This image must look EXACTLY like an actual screenshot captured from a live, deployed software product running on a real device.
+    // ── CONCISE HIGH-IMPACT PROMPT (shorter = better for image models) ────────────
+    const imagePrompt = `Photorealistic UI screenshot of "${screen_name}" screen for "${project.title}", a ${project.type ?? "SaaS"} app in the ${project.niche ?? "tech"} industry.
 
-THIS IS NOT:
-- Not a wireframe
-- Not a sketch or hand-drawn illustration  
-- Not a low-fidelity mockup
-- Not abstract art or concept art
-- Not a flat icon set
+Platform: ${effectivePlatform} — ${isMobile ? "mobile portrait 390×844px" : "desktop widescreen 1440×900px"}.
 
-THIS IS:
-✓ A REAL SCREENSHOT of a fully rendered, pixel-perfect UI
-✓ Every element fully rendered with actual colors, shadows, real typography
-✓ Data populated with realistic, domain-specific content (no Lorem ipsum, no placeholder text)
-✓ Looks exactly like what an end user would see when using the real app
+STYLE: Look exactly like a real production app screenshot (similar to ${styleAnchors}). Dark theme with deep navy/charcoal backgrounds (#0d1117, #161b22), electric blue accents (#4F8EF7), crisp white text, subtle card borders.
+
+SCREEN COMPONENTS: ${componentHints}
+
+NAVIGATION: ${navHints}
+
+DOMAIN DATA: ${nicheContext}
+
+${screen_description ? `SCREEN DETAILS: ${screen_description.slice(0, 400)}` : ""}
+
+REQUIREMENTS:
+- Photorealistic, pixel-perfect — looks like an ACTUAL SCREENSHOT from a live app
+- Fill entire canvas, no blank areas, no white padding
+- All text readable, domain-specific data (no Lorem ipsum)
+- Fully rendered buttons, inputs, cards, charts with realistic data
+- ${isMobile ? "iOS status bar at top (9:41, battery, signal)" : "App window chrome with titlebar"}
+
+NOT: wireframe, sketch, illustration, cartoon, placeholder boxes, abstract art.`;
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PROJECT CONTEXT
