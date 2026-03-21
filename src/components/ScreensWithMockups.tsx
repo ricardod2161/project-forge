@@ -515,6 +515,9 @@ const ScreensWithMockups = ({
   initialMockups = {},
   onMockupSaved,
   projectPlatform,
+  sectionLabel = "tela",
+  emptyTitle,
+  emptyDescription,
 }: ScreensWithMockupsProps) => {
   const [copied, setCopied] = useState(false);
   const [mockups, setMockups] = useState<Record<string, MockupState>>(() => {
@@ -528,10 +531,14 @@ const ScreensWithMockups = ({
   const [generateAllProgress, setGenerateAllProgress] = useState({ current: 0, total: 0, name: "" });
   const abortRef = useRef(false);
 
+  const sectionLabelPlural = sectionLabel === "página" ? "páginas" : sectionLabel === "seção" ? "seções" : "telas";
+
   // Determine if mobile platform for aspect ratio
-  const isMobilePlatform = ["mobile", "ios", "android", "react native", "flutter"].some(
-    k => (projectPlatform ?? "").toLowerCase().includes(k)
-  );
+  const isMobilePlatform = projectPlatform?.toLowerCase() === "web"
+    ? false
+    : ["mobile", "ios", "android", "react native", "flutter"].some(
+        k => (projectPlatform ?? "").toLowerCase().includes(k)
+      );
 
   const handleCopy = async () => {
     if (!persistedContent) return;
