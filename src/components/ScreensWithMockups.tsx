@@ -30,53 +30,58 @@ export interface ScreensWithMockupsProps {
   initialMockups?: Record<string, string>;
   /** called whenever a new mockup is generated, for persistence */
   onMockupSaved?: (screenName: string, url: string) => void;
+  /** project platform for aspect ratio detection */
+  projectPlatform?: string;
 }
 
-// ── Robust screen parser ───────────────────────────────────────────────────────
+// ── Robust screen parser — collects up to 800 chars of full description ────────
 // Handles: ## Tela: X / ## Tela X: / ### Tela: / ## Screen: / ## 1. Tela / ## Tela 1 - X
+// Also handles generic headers that are likely screen names in context
 export function parseScreens(markdown: string): Array<{ name: string; description: string }> {
   const screens: Array<{ name: string; description: string }> = [];
   const lines = markdown.split("\n");
-  let currentScreen: { name: string; description: string } | null = null;
-  const descLines: string[] = [];
+  let currentScreen: { name: string; descLines: string[] } | null = null;
 
   const SCREEN_PATTERNS = [
-    /^#{2,3}\s+Tela\s*[:–-]\s*(.+)$/i,           // ## Tela: X  /  ## Tela - X
-    /^#{2,3}\s+Tela\s+\d+\s*[:–-]\s*(.+)$/i,    // ## Tela 1: X
-    /^#{2,3}\s+\d+\.\s+(.+(?:tela|screen|page|página).*)$/i, // ## 1. Login Screen
-    /^#{2,3}\s+Screen\s*[:–-]\s*(.+)$/i,          // ## Screen: X
-    /^#{2,3}\s+Página\s*[:–-]\s*(.+)$/i,          // ## Página: X
-    /^#{2,3}\s+(.+)\s+(?:Screen|Tela|Page|Página)$/i, // ## Login Screen
+    /^#{2,3}\s+Tela\s*[:–-]\s*(.+)$/i,                       // ## Tela: X  /  ## Tela - X
+    /^#{2,3}\s+Tela\s+\d+\s*[:–-]\s*(.+)$/i,                // ## Tela 1: X
+    /^#{2,3}\s+\d+[\.\)]\s+(.+(?:tela|screen|page|página|login|dashboard|painel|lista|detalhe|formulário|form|perfil|configuração|chat|notifica|onboard|cadastro|busca|search).*)$/i, // ## 1. Login Screen
+    /^#{2,3}\s+Screen\s*[:–-]\s*(.+)$/i,                      // ## Screen: X
+    /^#{2,3}\s+Página\s*[:–-]\s*(.+)$/i,                      // ## Página: X
+    /^#{2,3}\s+(.+)\s+(?:Screen|Tela|Page|Página)$/i,         // ## Login Screen
+    /^#{2,3}\s+(?:\d+[\.\)]\s+)?(\w[^#\n]{2,40})$/i,          // ## Dashboard / ## Login / ## Cadastro (generic short h2/h3)
   ];
+
+  const pushCurrent = () => {
+    if (!currentScreen) return;
+    const description = currentScreen.descLines
+      .join(" ")
+      .trim()
+      .slice(0, 800); // ← 800 chars (was 400) for richer AI context
+    screens.push({ name: currentScreen.name, description });
+  };
 
   for (const line of lines) {
     let matched = false;
     for (const pattern of SCREEN_PATTERNS) {
       const m = line.match(pattern);
       if (m) {
-        if (currentScreen) {
-          currentScreen.description = descLines.join(" ").trim().slice(0, 400);
-          screens.push(currentScreen);
-          descLines.length = 0;
-        }
-        currentScreen = { name: m[1].trim(), description: "" };
+        pushCurrent();
+        currentScreen = { name: m[1].trim(), descLines: [] };
         matched = true;
         break;
       }
     }
     if (!matched && currentScreen && line.trim() && !line.startsWith("#") && !line.startsWith("---")) {
-      // Collect first 4 non-header, non-bullet lines as description
-      if (descLines.length < 4) {
-        descLines.push(line.replace(/^[-*•]\s*/, "").trim());
+      // Collect ALL non-header lines (up to 800 chars when joined)
+      const joined = currentScreen.descLines.join(" ");
+      if (joined.length < 800) {
+        currentScreen.descLines.push(line.replace(/^[-*•]\s*/, "").trim());
       }
     }
   }
 
-  if (currentScreen) {
-    currentScreen.description = descLines.join(" ").trim().slice(0, 400);
-    screens.push(currentScreen);
-  }
-
+  pushCurrent();
   return screens.slice(0, 10); // max 10 screens
 }
 
@@ -189,18 +194,24 @@ const MockupCard = ({
   projectId,
   mockup,
   onMockupGenerated,
+  platformType,
+  isMobile,
 }: {
   screenName: string;
   screenDescription: string;
   projectId: string;
   mockup: MockupState;
   onMockupGenerated: (name: string, url: string, persisted: boolean) => void;
+  platformType?: string;
+  isMobile?: boolean;
 }) => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [confirmRegen, setConfirmRegen] = useState(false);
   const [showPrev, setShowPrev] = useState(false);
 
   const isGenerating = mockup.isLoading;
+  // Aspect ratio: portrait for mobile, widescreen for web/desktop
+  const aspectClass = isMobile ? "aspect-[9/16]" : "aspect-[16/10]";
 
   const doGenerate = async () => {
     setConfirmRegen(false);
@@ -210,6 +221,7 @@ const MockupCard = ({
           project_id: projectId,
           screen_name: screenName,
           screen_description: screenDescription,
+          platform_type: platformType,
         },
       });
       if (error) throw error;
@@ -265,10 +277,10 @@ const MockupCard = ({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="rounded-xl border border-border bg-card overflow-hidden flex flex-col group"
+        className="rounded-xl border border-border bg-card overflow-hidden flex flex-col group hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200"
       >
-        {/* Image area */}
-        <div className="relative aspect-[9/16] bg-muted/20 overflow-hidden">
+        {/* Image area — aspect ratio adapts to platform */}
+        <div className={cn("relative bg-muted/20 overflow-hidden", aspectClass)}>
           {isGenerating ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-muted/20">
               <div className="relative">
@@ -494,10 +506,10 @@ const ScreensWithMockups = ({
   onGenerate,
   initialMockups = {},
   onMockupSaved,
+  projectPlatform,
 }: ScreensWithMockupsProps) => {
   const [copied, setCopied] = useState(false);
   const [mockups, setMockups] = useState<Record<string, MockupState>>(() => {
-    // Initialize from persisted mockups
     const initial: Record<string, MockupState> = {};
     for (const [name, url] of Object.entries(initialMockups)) {
       initial[name] = { url, prevUrl: null, isLoading: false, error: null, persisted: true };
@@ -507,6 +519,11 @@ const ScreensWithMockups = ({
   const [generateAllActive, setGenerateAllActive] = useState(false);
   const [generateAllProgress, setGenerateAllProgress] = useState({ current: 0, total: 0, name: "" });
   const abortRef = useRef(false);
+
+  // Determine if mobile platform for aspect ratio
+  const isMobilePlatform = ["mobile", "ios", "android", "react native", "flutter"].some(
+    k => (projectPlatform ?? "").toLowerCase().includes(k)
+  );
 
   const handleCopy = async () => {
     if (!persistedContent) return;
@@ -551,7 +568,6 @@ const ScreensWithMockups = ({
     for (const screen of pendingScreens) {
       if (abortRef.current) break;
       setGenerateAllProgress({ current: done, total: pendingScreens.length, name: screen.name });
-      // Set loading on this card
       setMockups(prev => ({
         ...prev,
         [screen.name]: { ...( prev[screen.name] ?? { url: null, prevUrl: null, error: null, persisted: false }), isLoading: true },
@@ -563,6 +579,7 @@ const ScreensWithMockups = ({
             project_id: projectId,
             screen_name: screen.name,
             screen_description: screen.description,
+            platform_type: projectPlatform,
           },
         });
         if (!error && data?.image_url) {
@@ -583,7 +600,7 @@ const ScreensWithMockups = ({
       }
 
       // Delay to avoid rate limiting
-      if (!abortRef.current) await new Promise((r) => setTimeout(r, 2000));
+      if (!abortRef.current) await new Promise((r) => setTimeout(r, 2500));
     }
 
     setGenerateAllActive(false);
@@ -780,6 +797,8 @@ const ScreensWithMockups = ({
                 projectId={projectId}
                 mockup={mockups[screen.name] ?? { url: null, prevUrl: null, isLoading: false, error: null, persisted: false }}
                 onMockupGenerated={handleMockupGenerated}
+                platformType={projectPlatform}
+                isMobile={isMobilePlatform}
               />
             ))}
           </div>
