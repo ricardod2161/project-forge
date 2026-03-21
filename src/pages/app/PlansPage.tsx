@@ -94,7 +94,7 @@ const PlansPage = () => {
                   ? "border border-border text-muted-foreground cursor-default"
                   : "border border-border hover:border-primary/40 hover:bg-surface"
               )}>
-                {isCurrent ? "Plano atual" : `Assinar ${p.name}`}
+                {isCurrent ? "✓ Plano atual" : p.id === "free" ? "Começar grátis" : "Entrar em contato"}
               </button>
             </div>
           );

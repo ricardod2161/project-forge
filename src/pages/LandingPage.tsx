@@ -275,7 +275,7 @@ const LandingPage = () => {
                       : "border border-border hover:border-primary/40 hover:bg-surface"
                   )}
                 >
-                  Começar agora
+                  Começar grátis
                 </Link>
               </motion.div>
             ))}
