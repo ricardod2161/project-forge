@@ -751,7 +751,7 @@ CUSTOM HOOKS:
 - useDebounce: para inputs de busca
 
 TYPESCRIPT STRICTNESS:
-- Eliminar todos os `any` → tipos específicos ou unknown
+- Eliminar todos os 'any' → tipos específicos ou unknown
 - Tipar responses Supabase: Database['public']['Tables'][tabela]['Row']
 - Zod schemas exportados e reutilizados entre frontend e backend
 
