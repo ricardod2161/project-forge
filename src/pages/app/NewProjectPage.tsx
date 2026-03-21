@@ -1,10 +1,12 @@
 import { useState, KeyboardEvent } from "react";
-import { ArrowLeft, Sparkles, X, Check, Plus } from "lucide-react";
+import { ArrowLeft, Sparkles, X, Check, Plus, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useProjectWizard } from "@/hooks/useProjectWizard";
 import { useCreateProject } from "@/hooks/useProjects";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
