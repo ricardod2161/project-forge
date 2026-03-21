@@ -844,7 +844,7 @@ const AIContentTabWrapper = ({
   onContentGenerated,
 }: {
   projectId: string;
-  contentType: "modules" | "screens" | "database" | "rules";
+  contentType: "modules" | "database" | "rules";
   icon: React.ElementType;
   title: string;
   description: string;
@@ -897,6 +897,63 @@ const AIContentTabWrapper = ({
       isLoading={isLoading}
       content={persistedContent}
       error={error}
+    />
+  );
+};
+
+// ── ScreensTabWrapper — aba de Telas com geração de mockups ───────────────────
+const ScreensTabWrapper = ({
+  projectId,
+  persistedContent,
+  onContentGenerated,
+}: {
+  projectId: string;
+  persistedContent: string | null;
+  onContentGenerated: (contentType: string, content: string) => void;
+}) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGenerate = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke("generate-ai-content", {
+        body: { project_id: projectId, content_type: "screens" },
+      });
+      if (invokeError) throw invokeError;
+      if (data?.error) {
+        if (data.error.includes("429") || data.error.includes("Limite")) {
+          setError("Limite de requisições atingido. Aguarde alguns minutos.");
+        } else if (data.error.includes("402") || data.error.includes("Créditos")) {
+          setError("Créditos insuficientes.");
+        } else {
+          setError(data.error);
+        }
+        return;
+      }
+      const generated = data?.content ?? "";
+      onContentGenerated("screens", generated);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao gerar conteúdo";
+      if (msg.includes("429") || msg.includes("rate")) {
+        setError("Limite de requisições atingido. Aguarde alguns minutos.");
+      } else {
+        setError("Erro ao gerar telas. Tente novamente.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <ScreensWithMockups
+      projectId={projectId}
+      persistedContent={persistedContent}
+      onContentGenerated={onContentGenerated}
+      isLoading={isLoading}
+      error={error}
+      onGenerate={handleGenerate}
     />
   );
 };
