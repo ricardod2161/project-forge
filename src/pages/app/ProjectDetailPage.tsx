@@ -1095,11 +1095,11 @@ const ProjectDetailPage = () => {
           {activeTab === "idea"      && <IdeaTab idea={project.original_idea} />}
           {activeTab === "prompts"   && <PromptsTab projectId={project.id} />}
           {activeTab === "versions"  && <VersionsTab projectId={project.id} />}
-          {activeTab === "modules"   && <AIContentTabWrapper projectId={project.id} contentType="modules" icon={Puzzle} title="Módulos do Sistema" description="A IA decomporá o projeto em módulos bem definidos, com funcionalidades, dependências e complexidade de cada um." />}
-          {activeTab === "screens"   && <AIContentTabWrapper projectId={project.id} contentType="screens" icon={Monitor} title="Mapa de Telas" description="A IA mapeará todas as telas, rotas, elementos de UI e fluxos de usuário do sistema." />}
-          {activeTab === "database"  && <AIContentTabWrapper projectId={project.id} contentType="database" icon={Database} title="Esquema do Banco de Dados" description="A IA gerará o schema SQL completo com tabelas, relacionamentos, índices e RLS policies." />}
-          {activeTab === "rules"     && <AIContentTabWrapper projectId={project.id} contentType="rules" icon={ScrollText} title="Regras de Negócio" description="A IA documentará todas as regras de negócio, validações e fluxos condicionais do sistema." />}
-          {activeTab === "exports"   && <EmptyTab icon={Download} title="Exportações" sub="Exporte a documentação técnica completa do projeto em diferentes formatos." />}
+          {activeTab === "modules"   && <AIContentTabWrapper projectId={project.id} contentType="modules" icon={Puzzle} title="Módulos do Sistema" description="A IA decomporá o projeto em módulos bem definidos, com funcionalidades, dependências e complexidade de cada um." persistedContent={aiContentCache["modules"] ?? null} onContentGenerated={handleContentGenerated} />}
+          {activeTab === "screens"   && <AIContentTabWrapper projectId={project.id} contentType="screens" icon={Monitor} title="Mapa de Telas" description="A IA mapeará todas as telas, rotas, elementos de UI e fluxos de usuário do sistema." persistedContent={aiContentCache["screens"] ?? null} onContentGenerated={handleContentGenerated} />}
+          {activeTab === "database"  && <AIContentTabWrapper projectId={project.id} contentType="database" icon={Database} title="Esquema do Banco de Dados" description="A IA gerará o schema SQL completo com tabelas, relacionamentos, índices e RLS policies." persistedContent={aiContentCache["database"] ?? null} onContentGenerated={handleContentGenerated} />}
+          {activeTab === "rules"     && <AIContentTabWrapper projectId={project.id} contentType="rules" icon={ScrollText} title="Regras de Negócio" description="A IA documentará todas as regras de negócio, validações e fluxos condicionais do sistema." persistedContent={aiContentCache["rules"] ?? null} onContentGenerated={handleContentGenerated} />}
+          {activeTab === "exports"   && <InlineExportTab project={project} />}
           {activeTab === "eval"      && <EvalTab projectId={project.id} currentScore={project.quality_score} />}
           {activeTab === "ai"        && <AIReviewTab projectId={project.id} />}
         </div>
