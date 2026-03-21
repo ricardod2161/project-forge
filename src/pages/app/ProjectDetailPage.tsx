@@ -6,14 +6,14 @@ import {
   Monitor, Database, ScrollText, Zap, Download, BarChart3, History,
   Bot, MoreHorizontal, Trash2, Archive, Edit3, Tag, Users, Globe, Puzzle,
   RefreshCw, AlertTriangle, AlertCircle, Lightbulb as LightbulbIcon, TrendingUp, ShieldAlert,
-  Plus, Loader2, RadarIcon,
+  Plus, Loader2, FileText, ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useProjectDetail, useProjectPrompts, useProjectVersions, useUpdateProject, useDeleteProject } from "@/hooks/useProjectDetail";
-import { useToggleFavorite } from "@/hooks/useProjects";
+import { useToggleFavorite, type Project } from "@/hooks/useProjects";
 import AIStreamingIndicator from "@/components/AIStreamingIndicator";
 import AIContentTab from "@/components/AIContentTab";
 import ScoreRing from "@/components/ScoreRing";
@@ -832,21 +832,24 @@ const VersionsTab = ({ projectId }: { projectId: string }) => {
   );
 };
 
-// ── AIContentTabWrapper — estado local por aba ────────────────────────────────
+// ── AIContentTabWrapper — estado persistido no pai ────────────────────────────
 const AIContentTabWrapper = ({
   projectId,
   contentType,
   icon,
   title,
   description,
+  persistedContent,
+  onContentGenerated,
 }: {
   projectId: string;
   contentType: "modules" | "screens" | "database" | "rules";
   icon: React.ElementType;
   title: string;
   description: string;
+  persistedContent: string | null;
+  onContentGenerated: (contentType: string, content: string) => void;
 }) => {
-  const [content, setContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -854,10 +857,10 @@ const AIContentTabWrapper = ({
     setIsLoading(true);
     setError(null);
     try {
-      const { data, err } = await supabase.functions.invoke("generate-ai-content", {
+      const { data, error: invokeError } = await supabase.functions.invoke("generate-ai-content", {
         body: { project_id: projectId, content_type: contentType },
-      }) as { data: { content?: string; error?: string } | null; err?: unknown };
-      if (err) throw err;
+      });
+      if (invokeError) throw invokeError;
       if (data?.error) {
         if (data.error.includes("429") || data.error.includes("Limite")) {
           setError("Limite de requisições atingido. Aguarde alguns minutos.");
@@ -868,9 +871,15 @@ const AIContentTabWrapper = ({
         }
         return;
       }
-      setContent(data?.content ?? "");
-    } catch {
-      setError("Erro ao gerar conteúdo. Tente novamente.");
+      const generated = data?.content ?? "";
+      onContentGenerated(contentType, generated);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao gerar conteúdo";
+      if (msg.includes("429") || msg.includes("rate")) {
+        setError("Limite de requisições atingido. Aguarde alguns minutos.");
+      } else {
+        setError("Erro ao gerar conteúdo. Tente novamente.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -885,13 +894,103 @@ const AIContentTabWrapper = ({
       description={description}
       onGenerate={handleGenerate}
       isLoading={isLoading}
-      content={content}
+      content={persistedContent}
       error={error}
     />
   );
 };
 
-// ── Main Component ─────────────────────────────────────────────────────────────
+// ── Tab: Inline Export ───────────────────────────────────────────────────────
+const generateDocFromProject = (project: Project): string => {
+  const lines: string[] = [];
+  const line = (s: string) => lines.push(s);
+  const br = () => lines.push("");
+  line(`# ${project.title}`);
+  br();
+  line(`**Status:** ${project.status === "active" ? "Ativo" : project.status === "draft" ? "Rascunho" : "Arquivado"}`);
+  if (project.type)       line(`**Tipo:** ${project.type}`);
+  if (project.niche)      line(`**Nicho:** ${project.niche}`);
+  if (project.platform)   line(`**Plataforma:** ${project.platform}`);
+  if (project.complexity !== null && project.complexity !== undefined) line(`**Complexidade:** ${project.complexity}/5`);
+  br();
+  if (project.original_idea) { line(`## Ideia Original`); br(); line(project.original_idea); br(); }
+  if (project.description)   { line(`## Descrição`); br(); line(project.description); br(); }
+  if (project.audience)      { line(`## Público-Alvo`); br(); line(project.audience); br(); }
+  if (project.features && project.features.length > 0) {
+    line(`## Funcionalidades`); br();
+    project.features.forEach(f => line(`- ${f}`));
+    br();
+  }
+  if (project.integrations && project.integrations.length > 0) {
+    line(`## Integrações`); br();
+    project.integrations.forEach(i => line(`- ${i}`));
+    br();
+  }
+  if (project.monetization) { line(`## Modelo de Monetização`); br(); line(project.monetization); br(); }
+  line(`---`);
+  line(`*Gerado em ${new Date().toLocaleDateString("pt-BR")} · Arquiteto IA*`);
+  return lines.join("\n");
+};
+
+const InlineExportTab = ({ project }: { project: Project }) => {
+  const [copied, setCopied] = useState(false);
+  const docContent = generateDocFromProject(project);
+  const fileName = `${project.slug ?? project.title.toLowerCase().replace(/\s+/g, "-")}.md`;
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(docContent);
+    setCopied(true);
+    toast.success("Documentação copiada!");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([docContent], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Arquivo baixado!");
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+      className="space-y-4">
+      {/* Actions */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <button onClick={handleCopy}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-border hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-all">
+          {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
+          {copied ? "Copiado!" : "Copiar Markdown"}
+        </button>
+        <button onClick={handleDownload}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-all">
+          <Download className="w-3.5 h-3.5" />
+          Baixar .md
+        </button>
+      </div>
+      {/* Preview */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-2">
+            <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-2xs font-medium text-muted-foreground">{fileName}</span>
+          </div>
+          <span className="text-2xs text-muted-foreground">{docContent.length} caracteres</span>
+        </div>
+        <pre className="p-5 text-2xs text-foreground leading-relaxed whitespace-pre-wrap font-mono overflow-auto max-h-[480px]">
+          {docContent}
+        </pre>
+      </div>
+    </motion.div>
+  );
+};
+
+
 const ProjectDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -899,6 +998,12 @@ const ProjectDetailPage = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
+  // Persists AI-generated content for the lifetime of the parent component (survives tab switching)
+  const [aiContentCache, setAiContentCache] = useState<Record<string, string | null>>({});
+
+  const handleContentGenerated = useCallback((contentType: string, content: string) => {
+    setAiContentCache(prev => ({ ...prev, [contentType]: content }));
+  }, []);
 
   const { data: project, isLoading, error } = useProjectDetail(id);
   const toggleFavorite = useToggleFavorite();
@@ -1080,11 +1185,11 @@ const ProjectDetailPage = () => {
           {activeTab === "idea"      && <IdeaTab idea={project.original_idea} />}
           {activeTab === "prompts"   && <PromptsTab projectId={project.id} />}
           {activeTab === "versions"  && <VersionsTab projectId={project.id} />}
-          {activeTab === "modules"   && <AIContentTabWrapper projectId={project.id} contentType="modules" icon={Puzzle} title="Módulos do Sistema" description="A IA decomporá o projeto em módulos bem definidos, com funcionalidades, dependências e complexidade de cada um." />}
-          {activeTab === "screens"   && <AIContentTabWrapper projectId={project.id} contentType="screens" icon={Monitor} title="Mapa de Telas" description="A IA mapeará todas as telas, rotas, elementos de UI e fluxos de usuário do sistema." />}
-          {activeTab === "database"  && <AIContentTabWrapper projectId={project.id} contentType="database" icon={Database} title="Esquema do Banco de Dados" description="A IA gerará o schema SQL completo com tabelas, relacionamentos, índices e RLS policies." />}
-          {activeTab === "rules"     && <AIContentTabWrapper projectId={project.id} contentType="rules" icon={ScrollText} title="Regras de Negócio" description="A IA documentará todas as regras de negócio, validações e fluxos condicionais do sistema." />}
-          {activeTab === "exports"   && <EmptyTab icon={Download} title="Exportações" sub="Exporte a documentação técnica completa do projeto em diferentes formatos." />}
+          {activeTab === "modules"   && <AIContentTabWrapper projectId={project.id} contentType="modules" icon={Puzzle} title="Módulos do Sistema" description="A IA decomporá o projeto em módulos bem definidos, com funcionalidades, dependências e complexidade de cada um." persistedContent={aiContentCache["modules"] ?? null} onContentGenerated={handleContentGenerated} />}
+          {activeTab === "screens"   && <AIContentTabWrapper projectId={project.id} contentType="screens" icon={Monitor} title="Mapa de Telas" description="A IA mapeará todas as telas, rotas, elementos de UI e fluxos de usuário do sistema." persistedContent={aiContentCache["screens"] ?? null} onContentGenerated={handleContentGenerated} />}
+          {activeTab === "database"  && <AIContentTabWrapper projectId={project.id} contentType="database" icon={Database} title="Esquema do Banco de Dados" description="A IA gerará o schema SQL completo com tabelas, relacionamentos, índices e RLS policies." persistedContent={aiContentCache["database"] ?? null} onContentGenerated={handleContentGenerated} />}
+          {activeTab === "rules"     && <AIContentTabWrapper projectId={project.id} contentType="rules" icon={ScrollText} title="Regras de Negócio" description="A IA documentará todas as regras de negócio, validações e fluxos condicionais do sistema." persistedContent={aiContentCache["rules"] ?? null} onContentGenerated={handleContentGenerated} />}
+          {activeTab === "exports"   && <InlineExportTab project={project} />}
           {activeTab === "eval"      && <EvalTab projectId={project.id} currentScore={project.quality_score} />}
           {activeTab === "ai"        && <AIReviewTab projectId={project.id} />}
         </div>

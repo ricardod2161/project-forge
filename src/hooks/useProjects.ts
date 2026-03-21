@@ -47,6 +47,7 @@ export interface CreateProjectInput {
 export interface ProjectMetrics {
   totalProjects: number;
   activeProjects: number;
+  favoriteProjects: number;
   totalPrompts: number;
   avgScore: number | null;
 }
@@ -77,7 +78,7 @@ export function useProjectMetrics() {
       const [projectsRes, promptsRes] = await Promise.all([
         supabase
           .from("projects")
-          .select("status, quality_score")
+          .select("status, quality_score, is_favorite")
           .eq("user_id", userId),
         supabase
           .from("prompts")
@@ -88,6 +89,7 @@ export function useProjectMetrics() {
       const projects = projectsRes.data ?? [];
       const totalProjects = projects.length;
       const activeProjects = projects.filter((p) => p.status === "active").length;
+      const favoriteProjects = projects.filter((p) => p.is_favorite).length;
       const totalPrompts = promptsRes.count ?? 0;
 
       const scored = projects.filter((p) => p.quality_score !== null);
@@ -96,7 +98,7 @@ export function useProjectMetrics() {
           ? Math.round(scored.reduce((sum, p) => sum + (p.quality_score ?? 0), 0) / scored.length)
           : null;
 
-      return { totalProjects, activeProjects, totalPrompts, avgScore };
+      return { totalProjects, activeProjects, favoriteProjects, totalPrompts, avgScore };
     },
   });
 }

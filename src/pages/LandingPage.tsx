@@ -173,15 +173,17 @@ const LandingPage = () => {
               Como funciona em <span className="text-gradient">3 passos</span>
             </h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
             {howItWorks.map((step, i) => (
               <motion.div key={step.step} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: i * 0.15 }} viewport={{ once: true }}
-                className="flex flex-col items-center text-center">
+                className="flex flex-col items-center text-center relative">
                 <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 shadow-glow">
                   <span className="font-display font-bold text-primary text-lg">{step.step}</span>
                 </div>
-                {i < 2 && <div className="hidden md:block absolute mt-7 ml-48 w-16 h-px bg-border" />}
+                {i < 2 && (
+                  <div className="hidden md:block absolute left-full top-7 w-8 h-px bg-border -translate-x-4" />
+                )}
                 <h3 className="font-display font-semibold text-sm mb-2">{step.title}</h3>
                 <p className="text-muted-foreground text-xs leading-relaxed">{step.desc}</p>
               </motion.div>
@@ -273,7 +275,7 @@ const LandingPage = () => {
                       : "border border-border hover:border-primary/40 hover:bg-surface"
                   )}
                 >
-                  Começar agora
+                  Começar grátis
                 </Link>
               </motion.div>
             ))}

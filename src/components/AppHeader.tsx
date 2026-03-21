@@ -12,27 +12,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useAppTheme } from "@/hooks/useAppTheme";
 import CommandPalette from "@/components/CommandPalette";
 
 const AppHeader = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [cmdOpen, setCmdOpen] = useState(false);
-
-  const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem("theme");
-    return saved ? saved === "dark" : true;
-  });
-
-  useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.remove("light");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.add("light");
-      localStorage.setItem("theme", "light");
-    }
-  }, [isDark]);
+  const { isDark, toggleTheme } = useAppTheme();
 
   // Atalho de teclado Cmd+K / Ctrl+K para abrir Command Palette
   useEffect(() => {
@@ -88,7 +75,7 @@ const AppHeader = () => {
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            onClick={() => setIsDark(!isDark)}
+            onClick={toggleTheme}
             aria-label="Alternar tema"
           >
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}

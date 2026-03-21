@@ -92,15 +92,23 @@ const PromptsPage = () => {
             <Zap className="w-6 h-6 text-primary/60" />
           </div>
           <p className="font-medium text-xs text-foreground mb-1">Nenhum prompt ainda</p>
-          <p className="text-2xs text-muted-foreground text-center max-w-xs mb-4">
-            Crie um projeto e gere seus primeiros prompts para visualizá-los aqui.
+          <p className="text-2xs text-muted-foreground text-center max-w-xs mb-5 leading-relaxed">
+            Abra um projeto e clique em <strong>"Gerar Prompt com IA"</strong> na aba <strong>Prompts</strong> para criar seu primeiro prompt.
           </p>
-          <Link
-            to="/app/projetos/novo"
-            className="px-4 py-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            Criar primeiro projeto
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/app/projetos"
+              className="px-4 py-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Ver meus projetos
+            </Link>
+            <Link
+              to="/app/projetos/novo"
+              className="px-4 py-2 rounded-lg text-xs font-medium border border-border hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-all"
+            >
+              Criar novo projeto
+            </Link>
+          </div>
         </motion.div>
       )}
 
