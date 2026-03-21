@@ -16,6 +16,7 @@ import { useProjectDetail, useProjectPrompts, useProjectVersions, useUpdateProje
 import { useToggleFavorite, type Project } from "@/hooks/useProjects";
 import AIStreamingIndicator from "@/components/AIStreamingIndicator";
 import AIContentTab from "@/components/AIContentTab";
+import ScreensWithMockups from "@/components/ScreensWithMockups";
 import ScoreRing from "@/components/ScoreRing";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,

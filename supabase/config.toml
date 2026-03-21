@@ -15,3 +15,7 @@ verify_jwt = false
 [functions.evaluate-project]
 verify_jwt = false
 
+[functions.generate-screen-mockup]
+verify_jwt = false
+
+
