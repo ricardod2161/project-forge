@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": allowedOrigin,
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
@@ -21,7 +22,6 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Auth: validate JWT from request header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -30,12 +30,10 @@ serve(async (req) => {
       );
     }
 
-    // Create client with user's JWT to respect RLS
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Get user from JWT
     const { data: { user }, error: authError } = await supabase.auth.getUser(
       authHeader.replace("Bearer ", "")
     );
@@ -54,7 +52,6 @@ serve(async (req) => {
       );
     }
 
-    // Fetch project data (RLS ensures user owns it)
     const { data: project, error: projectError } = await supabase
       .from("projects")
       .select("*")
@@ -69,7 +66,6 @@ serve(async (req) => {
       );
     }
 
-    // Build a rich context for the AI
     const projectContext = `
 PROJETO: ${project.title}
 Tipo: ${project.type ?? "Não definido"}
@@ -105,7 +101,6 @@ Severidades: "critico" para bloqueadores de produção, "importante" para gaps s
 
     const userPrompt = `Analise este projeto de software e retorne seus findings:\n\n${projectContext}`;
 
-    // Call AI Gateway with tool calling for structured output
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -113,7 +108,7 @@ Severidades: "critico" para bloqueadores de produção, "importante" para gaps s
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
