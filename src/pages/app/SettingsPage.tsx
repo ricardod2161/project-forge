@@ -321,27 +321,34 @@ const SecuritySection = () => {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 const SettingsPage = () => (
-  <div className="space-y-6 max-w-2xl">
+  <div className="space-y-6 max-w-4xl">
     <div>
-      <h1 className="font-display font-bold text-xl text-foreground">Configurações</h1>
-      <p className="text-muted-foreground text-xs mt-1">Gerencie sua conta e preferências</p>
+      <h1 className="font-display font-bold text-lg text-foreground">Configurações</h1>
+      <p className="text-muted-foreground text-xs mt-0.5">Gerencie sua conta e preferências</p>
     </div>
 
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="space-y-4"
     >
-      <ProfileSection />
-      <AppearanceSection />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <NotificationsSection />
-        <PlanSection />
+      {/* Two-column layout on desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Left column */}
+        <div className="space-y-5">
+          <ProfileSection />
+          <SecuritySection />
+        </div>
+        {/* Right column */}
+        <div className="space-y-5">
+          <AppearanceSection />
+          <NotificationsSection />
+          <PlanSection />
+        </div>
       </div>
-      <SecuritySection />
     </motion.div>
   </div>
 );
 
 export default SettingsPage;
+
