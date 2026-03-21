@@ -34,7 +34,7 @@ import {
 } from "recharts";
 
 
-const TABS = [
+const SYSTEM_TABS = [
   { id: "overview",  label: "Visão Geral",    icon: Layers     },
   { id: "idea",      label: "Ideia Original", icon: Lightbulb  },
   { id: "modules",   label: "Módulos",        icon: Puzzle     },
@@ -46,9 +46,23 @@ const TABS = [
   { id: "eval",      label: "Avaliação",      icon: BarChart3  },
   { id: "versions",  label: "Versões",        icon: History    },
   { id: "ai",        label: "Revisão IA",     icon: Bot        },
-] as const;
+];
 
-type TabId = typeof TABS[number]["id"];
+const WEBSITE_TABS = [
+  { id: "overview",   label: "Visão Geral",   icon: Layers     },
+  { id: "idea",       label: "Briefing",      icon: Lightbulb  },
+  { id: "pages",      label: "Páginas",       icon: Monitor    },
+  { id: "copy",       label: "Copywriting",   icon: ScrollText },
+  { id: "seo",        label: "SEO",           icon: TrendingUp },
+  { id: "structure",  label: "Estrutura",     icon: Code2      },
+  { id: "prompts",    label: "Prompts",       icon: Zap        },
+  { id: "exports",    label: "Exportações",   icon: Download   },
+  { id: "eval",       label: "Avaliação",     icon: BarChart3  },
+  { id: "versions",   label: "Versões",       icon: History    },
+  { id: "ai",         label: "Revisão IA",    icon: Bot        },
+];
+
+type TabId = string;
 
 const statusConfig = {
   draft:    { label: "Rascunho", classes: "bg-warning/10 text-warning border-warning/20" },
@@ -200,16 +214,29 @@ const IdeaTab = ({ idea }: { idea: string | null | undefined }) => {
 
 // ── Tab: Prompts ───────────────────────────────────────────────────────────────
 const PROMPT_TYPES_LIST = [
-  { value: "master",        label: "Mestre",         shortLabel: "Mestre",    platform: "Lovable",    desc: "Prompt completo com toda a arquitetura do projeto." },
-  { value: "frontend",      label: "Frontend",       shortLabel: "Frontend",  platform: "Lovable",    desc: "Componentes, páginas e design system do frontend." },
-  { value: "backend",       label: "Backend",        shortLabel: "Backend",   platform: "Supabase",   desc: "Banco de dados, funções edge e regras de negócio." },
-  { value: "database",      label: "Banco",          shortLabel: "Banco",     platform: "Supabase",   desc: "Schema SQL completo com tabelas, índices e RLS." },
-  { value: "dashboard",     label: "Dashboard",      shortLabel: "Dash",      platform: "Lovable",    desc: "Painel administrativo com métricas e gráficos." },
-  { value: "mvp",           label: "MVP",            shortLabel: "MVP",       platform: "Lovable",    desc: "Versão mínima viável com as funcionalidades core." },
-  { value: "premium",       label: "Premium",        shortLabel: "Premium",   platform: "Lovable",    desc: "Versão avançada com todas as funcionalidades." },
-  { value: "correction",    label: "Correção",       shortLabel: "Correção",  platform: "Lovable",    desc: "Guia para correção de bugs e melhorias de qualidade." },
-  { value: "refactoring",   label: "Refatoração",    shortLabel: "Refactor",  platform: "Lovable",    desc: "Reestruturação de código para escalabilidade." },
-  { value: "multiplatform", label: "Multiplataforma",shortLabel: "Multi",     platform: "Bubble",     desc: "Versão para múltiplas plataformas e dispositivos." },
+  { value: "master",        label: "Mestre",         shortLabel: "Mestre",    platform: "Lovable",          desc: "Prompt completo com toda a arquitetura do projeto." },
+  { value: "frontend",      label: "Frontend",       shortLabel: "Frontend",  platform: "Lovable",          desc: "Componentes, páginas e design system do frontend." },
+  { value: "backend",       label: "Backend",        shortLabel: "Backend",   platform: "Supabase",         desc: "Banco de dados, funções edge e regras de negócio." },
+  { value: "database",      label: "Banco",          shortLabel: "Banco",     platform: "Supabase",         desc: "Schema SQL completo com tabelas, índices e RLS." },
+  { value: "dashboard",     label: "Dashboard",      shortLabel: "Dash",      platform: "Lovable",          desc: "Painel administrativo com métricas e gráficos." },
+  { value: "mvp",           label: "MVP",            shortLabel: "MVP",       platform: "Lovable",          desc: "Versão mínima viável com as funcionalidades core." },
+  { value: "premium",       label: "Premium",        shortLabel: "Premium",   platform: "Lovable",          desc: "Versão avançada com todas as funcionalidades." },
+  { value: "correction",    label: "Correção",       shortLabel: "Correção",  platform: "Lovable",          desc: "Guia para correção de bugs e melhorias de qualidade." },
+  { value: "refactoring",   label: "Refatoração",    shortLabel: "Refactor",  platform: "Lovable",          desc: "Reestruturação de código para escalabilidade." },
+  { value: "multiplatform", label: "Multiplataforma",shortLabel: "Multi",     platform: "Bubble",           desc: "Versão para múltiplas plataformas e dispositivos." },
+];
+
+const WEBSITE_PROMPT_TYPES_LIST = [
+  { value: "site_master",      label: "Mestre do Site",  shortLabel: "Mestre",    platform: "Lovable",          desc: "Prompt mestre completo para construir todo o site." },
+  { value: "site_copy",        label: "Copywriting",     shortLabel: "Copy",      platform: "Geral",            desc: "Textos persuasivos para todas as seções do site." },
+  { value: "site_seo",         label: "Estratégia SEO",  shortLabel: "SEO",       platform: "Geral",            desc: "Keywords, meta tags, schema markup e checklist SEO." },
+  { value: "site_design",      label: "Design System",   shortLabel: "Design",    platform: "Figma / Lovable",  desc: "Paleta de cores, tipografia e componentes visuais." },
+  { value: "site_sections",    label: "Seções do Site",  shortLabel: "Seções",    platform: "Lovable",          desc: "Código detalhado para cada seção selecionada." },
+  { value: "site_performance", label: "Performance",     shortLabel: "Perf",      platform: "Geral",            desc: "Lazy loading, Core Web Vitals e checklist lighthouse." },
+  { value: "site_forms",       label: "Formulários",     shortLabel: "Forms",     platform: "Lovable",          desc: "Formulários com validação, integração e LGPD." },
+  { value: "site_ecommerce",   label: "E-commerce",      shortLabel: "Loja",      platform: "Lovable",          desc: "Catálogo, carrinho, checkout e painel admin." },
+  { value: "site_cms",         label: "Blog / CMS",      shortLabel: "CMS",       platform: "Lovable",          desc: "Blog com paginação, SEO e integração com CMS." },
+  { value: "site_deploy",      label: "Deploy",          shortLabel: "Deploy",    platform: "Vercel / Netlify", desc: "Guia completo de deploy e go-live." },
 ];
 
 const platformBadgeClasses: Record<string, string> = {

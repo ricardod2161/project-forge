@@ -7,20 +7,32 @@ export interface WizardState {
   // Navigation
   currentStep: number;
 
+  // Mode
+  mode: "system" | "website";
+
   // Step 1 — Ideia
   idea: string;
 
-  // Step 2 — Classificação
+  // Step 2 — Classificação (system)
   type: string;
   niche: string;
   complexity: number;
   platform: string;
 
-  // Step 3 — Detalhamento
+  // Step 3 — Detalhamento (system)
   audience: string;
   features: string[];
   monetization: string;
   integrations: string[];
+
+  // Website-specific
+  websiteSections: string[];
+  websiteStyle: string;
+  websiteTone: string;
+  websiteCMS: string;
+  websiteHasEcommerce: boolean;
+  websiteHasBlog: boolean;
+  websiteHasForm: boolean;
 
   // Derived
   title: string;
@@ -34,6 +46,8 @@ interface WizardActions {
   nextStep: () => void;
   prevStep: () => void;
 
+  setMode: (mode: "system" | "website") => void;
+
   setIdea: (idea: string) => void;
   setType: (type: string) => void;
   setNiche: (niche: string) => void;
@@ -45,6 +59,15 @@ interface WizardActions {
   removeFeature: (feature: string) => void;
   setMonetization: (monetization: string) => void;
   toggleIntegration: (integration: string) => void;
+
+  // Website actions
+  toggleWebsiteSection: (section: string) => void;
+  setWebsiteStyle: (style: string) => void;
+  setWebsiteTone: (tone: string) => void;
+  setWebsiteCMS: (cms: string) => void;
+  setWebsiteHasEcommerce: (v: boolean) => void;
+  setWebsiteHasBlog: (v: boolean) => void;
+  setWebsiteHasForm: (v: boolean) => void;
 
   setTitle: (title: string) => void;
   setIsSubmitting: (isSubmitting: boolean) => void;
@@ -58,6 +81,7 @@ export type WizardStore = WizardState & WizardActions;
 
 const initialState: WizardState = {
   currentStep: 0,
+  mode: "system",
   idea: "",
   type: "",
   niche: "",
@@ -67,6 +91,13 @@ const initialState: WizardState = {
   features: [],
   monetization: "",
   integrations: [],
+  websiteSections: [],
+  websiteStyle: "",
+  websiteTone: "",
+  websiteCMS: "",
+  websiteHasEcommerce: false,
+  websiteHasBlog: false,
+  websiteHasForm: false,
   title: "",
   isSubmitting: false,
 };
@@ -79,8 +110,14 @@ export const useProjectWizard = create<WizardStore>()(
       ...initialState,
 
       setStep: (step) => set({ currentStep: step }),
-      nextStep: () => set((s) => ({ currentStep: Math.min(s.currentStep + 1, 3) })),
+      // System: 0-4 (5 steps), Website: 0-3 (4 steps)
+      nextStep: () => set((s) => {
+        const max = s.mode === "website" ? 3 : 4;
+        return { currentStep: Math.min(s.currentStep + 1, max) };
+      }),
       prevStep: () => set((s) => ({ currentStep: Math.max(s.currentStep - 1, 0) })),
+
+      setMode: (mode) => set({ mode }),
 
       setIdea: (idea) => set({ idea }),
       setType: (type) => set({ type }),
@@ -107,6 +144,20 @@ export const useProjectWizard = create<WizardStore>()(
             : [...s.integrations, integration],
         })),
 
+      // Website actions
+      toggleWebsiteSection: (section) =>
+        set((s) => ({
+          websiteSections: s.websiteSections.includes(section)
+            ? s.websiteSections.filter((x) => x !== section)
+            : [...s.websiteSections, section],
+        })),
+      setWebsiteStyle: (websiteStyle) => set({ websiteStyle }),
+      setWebsiteTone: (websiteTone) => set({ websiteTone }),
+      setWebsiteCMS: (websiteCMS) => set({ websiteCMS }),
+      setWebsiteHasEcommerce: (websiteHasEcommerce) => set({ websiteHasEcommerce }),
+      setWebsiteHasBlog: (websiteHasBlog) => set({ websiteHasBlog }),
+      setWebsiteHasForm: (websiteHasForm) => set({ websiteHasForm }),
+
       setTitle: (title) => set({ title }),
       setIsSubmitting: (isSubmitting) => set({ isSubmitting }),
 
@@ -116,6 +167,7 @@ export const useProjectWizard = create<WizardStore>()(
       name: "wizard-storage",
       partialize: (state) => ({
         currentStep: state.currentStep,
+        mode: state.mode,
         idea: state.idea,
         type: state.type,
         niche: state.niche,
@@ -125,6 +177,13 @@ export const useProjectWizard = create<WizardStore>()(
         features: state.features,
         monetization: state.monetization,
         integrations: state.integrations,
+        websiteSections: state.websiteSections,
+        websiteStyle: state.websiteStyle,
+        websiteTone: state.websiteTone,
+        websiteCMS: state.websiteCMS,
+        websiteHasEcommerce: state.websiteHasEcommerce,
+        websiteHasBlog: state.websiteHasBlog,
+        websiteHasForm: state.websiteHasForm,
         title: state.title,
       }),
     }

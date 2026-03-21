@@ -44,6 +44,15 @@ export interface CreateProjectInput {
   integrations?: string[];
   description?: string;
   status?: "draft" | "active" | "archived";
+  // Website-specific
+  mode?: "system" | "website";
+  website_sections?: string[];
+  website_style?: string;
+  website_tone?: string;
+  website_cms?: string;
+  website_has_ecommerce?: boolean;
+  website_has_blog?: boolean;
+  website_has_form?: boolean;
 }
 
 export interface ProjectMetrics {
@@ -162,9 +171,23 @@ export function useCreateProject() {
     mutationFn: async (input: CreateProjectInput) => {
       if (!user?.id) throw new Error("Usuário não autenticado");
 
+      // Build metadata with mode and website-specific fields
+      const metadata: Record<string, unknown> = {
+        mode: input.mode ?? "system",
+        ...(input.mode === "website" ? {
+          website_sections: input.website_sections ?? [],
+          website_style: input.website_style ?? null,
+          website_tone: input.website_tone ?? null,
+          website_cms: input.website_cms ?? null,
+          website_has_ecommerce: input.website_has_ecommerce ?? false,
+          website_has_blog: input.website_has_blog ?? false,
+          website_has_form: input.website_has_form ?? false,
+        } : {}),
+      };
+
       const { data, error } = await supabase
         .from("projects")
-        .insert({
+        .insert([{
           user_id: user.id,
           title: input.title,
           slug: slugify(input.title),
@@ -179,7 +202,8 @@ export function useCreateProject() {
           monetization: input.monetization ?? null,
           integrations: input.integrations ?? [],
           status: input.status ?? "draft",
-        })
+          metadata: metadata as never,
+        }])
         .select()
         .single();
 
@@ -254,6 +278,7 @@ export function useDuplicateProject() {
           monetization: original.monetization,
           integrations: original.integrations ?? [],
           status: "draft",
+          metadata: original.metadata ?? {},
         })
         .select()
         .single();
