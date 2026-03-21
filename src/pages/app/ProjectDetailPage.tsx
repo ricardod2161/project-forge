@@ -200,30 +200,99 @@ const IdeaTab = ({ idea }: { idea: string | null | undefined }) => {
 
 // ── Tab: Prompts ───────────────────────────────────────────────────────────────
 const PROMPT_TYPES_LIST = [
-  { value: "master",        label: "Prompt Mestre" },
-  { value: "frontend",      label: "Frontend" },
-  { value: "backend",       label: "Backend" },
-  { value: "database",      label: "Banco de Dados" },
-  { value: "dashboard",     label: "Dashboard" },
-  { value: "mvp",           label: "MVP" },
-  { value: "premium",       label: "Versão Premium" },
-  { value: "correction",    label: "Correção de Bugs" },
-  { value: "refactoring",   label: "Refatoração" },
-  { value: "multiplatform", label: "Multiplataforma" },
+  { value: "master",        label: "Mestre",         shortLabel: "Mestre",    platform: "Lovable",    desc: "Prompt completo com toda a arquitetura do projeto." },
+  { value: "frontend",      label: "Frontend",       shortLabel: "Frontend",  platform: "Lovable",    desc: "Componentes, páginas e design system do frontend." },
+  { value: "backend",       label: "Backend",        shortLabel: "Backend",   platform: "Supabase",   desc: "Banco de dados, funções edge e regras de negócio." },
+  { value: "database",      label: "Banco",          shortLabel: "Banco",     platform: "Supabase",   desc: "Schema SQL completo com tabelas, índices e RLS." },
+  { value: "dashboard",     label: "Dashboard",      shortLabel: "Dash",      platform: "Lovable",    desc: "Painel administrativo com métricas e gráficos." },
+  { value: "mvp",           label: "MVP",            shortLabel: "MVP",       platform: "Lovable",    desc: "Versão mínima viável com as funcionalidades core." },
+  { value: "premium",       label: "Premium",        shortLabel: "Premium",   platform: "Lovable",    desc: "Versão avançada com todas as funcionalidades." },
+  { value: "correction",    label: "Correção",       shortLabel: "Correção",  platform: "Lovable",    desc: "Guia para correção de bugs e melhorias de qualidade." },
+  { value: "refactoring",   label: "Refatoração",    shortLabel: "Refactor",  platform: "Lovable",    desc: "Reestruturação de código para escalabilidade." },
+  { value: "multiplatform", label: "Multiplataforma",shortLabel: "Multi",     platform: "Bubble",     desc: "Versão para múltiplas plataformas e dispositivos." },
 ];
+
+const platformBadgeClasses: Record<string, string> = {
+  "Lovable":  "bg-primary/10 text-primary border-primary/20",
+  "Supabase": "bg-success/10 text-success border-success/20",
+  "Bubble":   "bg-accent/10 text-accent border-accent/20",
+};
+
+interface FocusModalProps {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  content: string;
+}
+const FocusModal = ({ open, onClose, title, content }: FocusModalProps) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl w-full h-[85vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="flex flex-row items-center justify-between px-5 py-3 border-b border-border shrink-0">
+          <DialogTitle className="text-sm font-semibold text-foreground">{title}</DialogTitle>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-2xs font-medium border border-border hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-all"
+            >
+              {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+              {copied ? "Copiado!" : "Copiar tudo"}
+            </button>
+            <button onClick={onClose} className="p-1.5 rounded-md hover:bg-muted transition-colors">
+              <X className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+        </DialogHeader>
+        <ScrollArea className="flex-1 p-5">
+          <pre className="text-2xs font-mono text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
+            {content}
+          </pre>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 const PromptsTab = ({ projectId }: { projectId: string }) => {
   const queryClient = useQueryClient();
   const { data: prompts, isLoading } = useProjectPrompts(projectId);
   const [selectedType, setSelectedType] = useState("master");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [showGenerator, setShowGenerator] = useState(false);
+  const [generatingTypes, setGeneratingTypes] = useState<Set<string>>(new Set());
+  const [selectedVersions, setSelectedVersions] = useState<Record<string, number>>({});
+  const [focusPrompt, setFocusPrompt] = useState<{ title: string; content: string } | null>(null);
 
-  const handleGenerate = async () => {
-    setIsGenerating(true);
+  // Group prompts by type, sorted by version DESC
+  const promptsByType = useMemo(() => {
+    const grouped: Record<string, typeof prompts extends undefined ? never[] : NonNullable<typeof prompts>> = {};
+    PROMPT_TYPES_LIST.forEach(t => { grouped[t.value] = []; });
+    (prompts ?? []).forEach(p => {
+      if (grouped[p.type]) grouped[p.type].push(p);
+    });
+    Object.keys(grouped).forEach(type => {
+      grouped[type].sort((a, b) => b.version - a.version);
+    });
+    return grouped;
+  }, [prompts]);
+
+  const currentTypeMeta = PROMPT_TYPES_LIST.find(t => t.value === selectedType)!;
+  const typePrompts = promptsByType[selectedType] ?? [];
+  const latestVersion = typePrompts[0]?.version;
+  const selectedVersion = selectedVersions[selectedType] ?? latestVersion;
+  const activePrompt = typePrompts.find(p => p.version === selectedVersion) ?? typePrompts[0];
+  const isCurrentGenerating = generatingTypes.has(selectedType);
+  const isOldVersion = activePrompt && latestVersion && activePrompt.version < latestVersion;
+
+  const handleGenerate = async (type: string) => {
+    setGeneratingTypes(prev => new Set(prev).add(type));
     try {
       const { data, error } = await supabase.functions.invoke("generate-prompt", {
-        body: { project_id: projectId, prompt_type: selectedType },
+        body: { project_id: projectId, prompt_type: type },
       });
       if (error) throw error;
       if (data?.error) {
@@ -233,104 +302,232 @@ const PromptsTab = ({ projectId }: { projectId: string }) => {
         return;
       }
       toast.success("Prompt gerado e salvo!");
+      // Reset to latest version for this type
+      setSelectedVersions(prev => {
+        const next = { ...prev };
+        delete next[type];
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: ["prompts", projectId] });
       queryClient.invalidateQueries({ queryKey: ["all-prompts"] });
-      setShowGenerator(false);
-    } catch (err) {
+    } catch {
       toast.error("Erro ao gerar prompt.");
     } finally {
-      setIsGenerating(false);
+      setGeneratingTypes(prev => { const s = new Set(prev); s.delete(type); return s; });
     }
   };
 
+  const lineCount = activePrompt?.content ? activePrompt.content.split("\n").length : 0;
+  const formattedDate = activePrompt?.created_at
+    ? new Date(activePrompt.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+    : null;
+
   if (isLoading) return (
     <div className="space-y-3">
-      {[1,2,3].map(i => <Skeleton key={i} className="h-24 w-full" />)}
+      {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
     </div>
   );
 
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-      className="space-y-4">
+      className="space-y-0">
 
-      {/* Botão gerar prompt */}
-      {!showGenerator ? (
-        <button
-          onClick={() => setShowGenerator(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all active:scale-[0.98]"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Gerar Prompt com IA
-        </button>
-      ) : (
-        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-3">
-          <h4 className="text-xs font-semibold text-foreground">Selecione o tipo de prompt</h4>
-          <div className="flex flex-wrap gap-2">
-            {PROMPT_TYPES_LIST.map(t => (
+      {/* ── Type sub-tabs ─────────────────────────────────────────────────── */}
+      <ScrollArea className="w-full" type="scroll">
+        <div className="flex gap-1 border-b border-border pb-0 mb-0 overflow-x-auto">
+          {PROMPT_TYPES_LIST.map(t => {
+            const tPrompts = promptsByType[t.value] ?? [];
+            const hasPrompt = tPrompts.length > 0;
+            const isGeneratingThis = generatingTypes.has(t.value);
+            const isActive = selectedType === t.value;
+            return (
               <button
                 key={t.value}
                 onClick={() => setSelectedType(t.value)}
                 className={cn(
-                  "px-3 py-1.5 rounded-full text-2xs font-medium border transition-all",
-                  selectedType === t.value
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border text-muted-foreground hover:border-primary/40"
+                  "relative flex items-center gap-1.5 px-3 py-2.5 text-2xs font-medium whitespace-nowrap transition-all duration-150 border-b-2 -mb-px shrink-0",
+                  isActive
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                 )}
               >
-                {t.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleGenerate}
-              disabled={isGenerating}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all disabled:opacity-60"
-            >
-              {isGenerating ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Gerando...</> : <><Bot className="w-3.5 h-3.5" /> Gerar</>}
-            </button>
-            <button
-              onClick={() => setShowGenerator(false)}
-              className="px-4 py-2 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Cancelar
-            </button>
-          </div>
-        </motion.div>
-      )}
-
-      {!prompts?.length ? (
-        <EmptyTab icon={Zap} title="Nenhum prompt gerado ainda"
-          sub="Clique em 'Gerar Prompt com IA' para criar o primeiro prompt deste projeto." />
-      ) : (
-        <div className="space-y-3">
-          {prompts.map((p) => (
-            <div key={p.id} className="p-4 rounded-xl border border-border bg-card">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div>
-                  <span className="px-2 py-0.5 rounded-full text-2xs font-medium bg-primary/10 text-primary border border-primary/20 mr-2">
-                    {p.type}
+                {isGeneratingThis ? (
+                  <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />
+                ) : hasPrompt ? (
+                  <span className="w-2 h-2 rounded-full bg-success flex-shrink-0" />
+                ) : (
+                  <span className="w-2 h-2 rounded-full bg-muted-foreground/30 flex-shrink-0" />
+                )}
+                {t.shortLabel}
+                {hasPrompt && !isGeneratingThis && (
+                  <span className={cn(
+                    "px-1 py-0.5 rounded text-[9px] font-bold leading-none",
+                    isActive ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                  )}>
+                    v{tPrompts[0].version}
                   </span>
-                  <span className="text-xs font-semibold text-foreground">{p.title}</span>
-                </div>
-                {p.content && <CopyButton text={p.content} />}
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </ScrollArea>
+
+      {/* ── Content panel ─────────────────────────────────────────────────── */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={selectedType}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.18 }}
+          className="pt-4"
+        >
+          {/* State 1: Generating */}
+          {isCurrentGenerating && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-center py-10">
+                <AIStreamingIndicator label={`Gerando prompt ${currentTypeMeta.label}...`} size="md" />
               </div>
-              {p.content && (
-                <p className="text-2xs text-muted-foreground line-clamp-3 leading-relaxed font-mono bg-muted/30 rounded-lg p-3">
-                  {p.content}
-                </p>
-              )}
-              <div className="flex items-center gap-3 mt-2 text-2xs text-muted-foreground">
-                <span>v{p.version}</span>
-                {p.tokens_estimate && <span>{p.tokens_estimate} tokens</span>}
-                {p.platform && <span>{p.platform}</span>}
+              <div className="space-y-2">
+                {[100, 85, 92, 70, 80].map((w, i) => (
+                  <Skeleton key={i} className="h-3 rounded" style={{ width: `${w}%` }} />
+                ))}
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          )}
 
+          {/* State 2: Not generated */}
+          {!isCurrentGenerating && !activePrompt && (
+            <div className="flex flex-col items-center justify-center py-14 rounded-xl border border-dashed border-border gap-5">
+              <div className="w-12 h-12 rounded-2xl bg-muted/60 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-muted-foreground/50" />
+              </div>
+              <div className="text-center max-w-xs">
+                <p className="text-xs font-semibold text-foreground mb-1">{currentTypeMeta.label}</p>
+                <p className="text-2xs text-muted-foreground leading-relaxed">{currentTypeMeta.desc}</p>
+                <span className={cn("inline-flex mt-2 px-2 py-0.5 rounded-full text-2xs font-medium border", platformBadgeClasses[currentTypeMeta.platform])}>
+                  {currentTypeMeta.platform}
+                </span>
+              </div>
+              <button
+                onClick={() => handleGenerate(selectedType)}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-[0.98] transition-all shadow-sm"
+              >
+                <Bot className="w-3.5 h-3.5" />
+                Gerar com IA
+              </button>
+            </div>
+          )}
+
+          {/* State 3: Has prompt */}
+          {!isCurrentGenerating && activePrompt && (
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-card">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={cn("px-2 py-0.5 rounded-full text-2xs font-semibold border", platformBadgeClasses[currentTypeMeta.platform])}>
+                    {currentTypeMeta.platform}
+                  </span>
+                  {/* Version selector */}
+                  {typePrompts.length > 1 ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className={cn(
+                          "flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold border transition-colors",
+                          isOldVersion
+                            ? "border-warning/30 bg-warning/10 text-warning"
+                            : "border-success/30 bg-success/10 text-success"
+                        )}>
+                          v{activePrompt.version}
+                          <ChevronDown className="w-2.5 h-2.5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="min-w-[120px]">
+                        {typePrompts.map(p => (
+                          <DropdownMenuItem
+                            key={p.id}
+                            onClick={() => setSelectedVersions(prev => ({ ...prev, [selectedType]: p.version }))}
+                            className={cn("text-2xs", activePrompt.version === p.version && "text-primary font-semibold")}
+                          >
+                            v{p.version}
+                            {p.version === latestVersion && <span className="ml-1.5 text-[9px] text-success font-bold">ATUAL</span>}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-2xs font-semibold border border-success/30 bg-success/10 text-success">
+                      v{activePrompt.version}
+                    </span>
+                  )}
+                  {activePrompt.tokens_estimate && (
+                    <span className="text-2xs text-muted-foreground font-medium">
+                      {activePrompt.tokens_estimate.toLocaleString()} tokens
+                    </span>
+                  )}
+                  {isOldVersion && (
+                    <span className="text-2xs text-warning font-medium">versão antiga</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => setFocusPrompt({ title: `${currentTypeMeta.label} · v${activePrompt.version}`, content: activePrompt.content ?? "" })}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-medium border border-border hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-all"
+                    title="Modo foco"
+                  >
+                    <Maximize2 className="w-3 h-3" />
+                  </button>
+                  {activePrompt.content && <CopyButton text={activePrompt.content} />}
+                  <button
+                    onClick={() => handleGenerate(selectedType)}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-medium border border-border hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-all"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Regenerar
+                  </button>
+                </div>
+              </div>
+
+              {/* Content */}
+              <ScrollArea className="h-[480px]">
+                <pre className="p-4 text-2xs font-mono text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
+                  {activePrompt.content ?? ""}
+                </pre>
+              </ScrollArea>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between px-4 py-2.5 border-t border-border bg-muted/20">
+                <div className="flex items-center gap-3 text-2xs text-muted-foreground">
+                  {formattedDate && <span>Gerado em {formattedDate}</span>}
+                  <span>{lineCount} linhas</span>
+                  {typePrompts.length > 1 && (
+                    <span>v{activePrompt.version} de {typePrompts.length} versões</span>
+                  )}
+                </div>
+                {isOldVersion && (
+                  <button
+                    onClick={() => setSelectedVersions(prev => { const n = { ...prev }; delete n[selectedType]; return n; })}
+                    className="text-2xs text-primary hover:underline font-medium"
+                  >
+                    Ver versão atual →
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Focus Modal */}
+      {focusPrompt && (
+        <FocusModal
+          open={!!focusPrompt}
+          onClose={() => setFocusPrompt(null)}
+          title={focusPrompt.title}
+          content={focusPrompt.content}
+        />
+      )}
     </motion.div>
   );
 };
