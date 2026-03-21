@@ -55,9 +55,7 @@ const statusConfig = {
 };
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
-const Skeleton = ({ className }: { className?: string }) => (
-  <div className={cn("rounded-md bg-muted/60 animate-pulse", className)} />
-);
+import { Skeleton } from "@/components/ui/skeleton";
 
 // ── Empty tab content ─────────────────────────────────────────────────────────
 const EmptyTab = ({ icon: Icon, title, sub }: { icon: React.ElementType; title: string; sub: string }) => (
