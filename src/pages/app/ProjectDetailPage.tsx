@@ -1296,6 +1296,7 @@ const ProjectDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  // TABS computed after project loads — use SYSTEM_TABS as fallback for loading skeleton
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
@@ -1359,7 +1360,7 @@ const ProjectDetailPage = () => {
     <div className="space-y-6">
       <Skeleton className="h-28 w-full rounded-xl" />
       <div className="flex gap-1 flex-wrap">
-        {TABS.map(t => <Skeleton key={t.id} className="h-8 w-24 rounded-lg" />)}
+        {SYSTEM_TABS.map(t => <Skeleton key={t.id} className="h-8 w-24 rounded-lg" />)}
       </div>
       <Skeleton className="h-64 w-full rounded-xl" />
     </div>
@@ -1378,6 +1379,9 @@ const ProjectDetailPage = () => {
   );
 
   const statusInfo = statusConfig[project.status as keyof typeof statusConfig] ?? statusConfig.draft;
+  const projectMeta = (project.metadata as Record<string, unknown>) ?? {};
+  const isWebsite = projectMeta.mode === "website";
+  const TABS = isWebsite ? WEBSITE_TABS : SYSTEM_TABS;
 
   return (
     <>

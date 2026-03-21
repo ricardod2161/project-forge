@@ -191,6 +191,7 @@ const ProjectsPage = () => {
                   score={project.quality_score ?? undefined}
                   isFavorite={project.is_favorite}
                   niche={project.niche ?? undefined}
+                  mode={(project.metadata as Record<string, unknown>)?.mode as "system" | "website" ?? "system"}
                   updatedAt={formatDistanceToNow(new Date(project.updated_at), {
                     addSuffix: true,
                     locale: ptBR,
