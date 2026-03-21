@@ -832,21 +832,24 @@ const VersionsTab = ({ projectId }: { projectId: string }) => {
   );
 };
 
-// ── AIContentTabWrapper — estado local por aba ────────────────────────────────
+// ── AIContentTabWrapper — estado persistido no pai ────────────────────────────
 const AIContentTabWrapper = ({
   projectId,
   contentType,
   icon,
   title,
   description,
+  persistedContent,
+  onContentGenerated,
 }: {
   projectId: string;
   contentType: "modules" | "screens" | "database" | "rules";
   icon: React.ElementType;
   title: string;
   description: string;
+  persistedContent: string | null;
+  onContentGenerated: (contentType: string, content: string) => void;
 }) => {
-  const [content, setContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -854,10 +857,10 @@ const AIContentTabWrapper = ({
     setIsLoading(true);
     setError(null);
     try {
-      const { data, err } = await supabase.functions.invoke("generate-ai-content", {
+      const { data, error: invokeError } = await supabase.functions.invoke("generate-ai-content", {
         body: { project_id: projectId, content_type: contentType },
-      }) as { data: { content?: string; error?: string } | null; err?: unknown };
-      if (err) throw err;
+      });
+      if (invokeError) throw invokeError;
       if (data?.error) {
         if (data.error.includes("429") || data.error.includes("Limite")) {
           setError("Limite de requisições atingido. Aguarde alguns minutos.");
@@ -868,9 +871,15 @@ const AIContentTabWrapper = ({
         }
         return;
       }
-      setContent(data?.content ?? "");
-    } catch {
-      setError("Erro ao gerar conteúdo. Tente novamente.");
+      const generated = data?.content ?? "";
+      onContentGenerated(contentType, generated);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao gerar conteúdo";
+      if (msg.includes("429") || msg.includes("rate")) {
+        setError("Limite de requisições atingido. Aguarde alguns minutos.");
+      } else {
+        setError("Erro ao gerar conteúdo. Tente novamente.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -885,7 +894,7 @@ const AIContentTabWrapper = ({
       description={description}
       onGenerate={handleGenerate}
       isLoading={isLoading}
-      content={content}
+      content={persistedContent}
       error={error}
     />
   );
