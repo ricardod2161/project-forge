@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": allowedOrigin,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
@@ -99,7 +100,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -165,6 +166,21 @@ serve(async (req) => {
       .update({ quality_score: Math.round(evaluation.overall_score) })
       .eq("id", project_id)
       .eq("user_id", user.id);
+
+    // Persistir avaliação detalhada na tabela evaluations
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    await serviceClient.from("evaluations").insert({
+      project_id,
+      user_id: user.id,
+      overall_score: Math.round(evaluation.overall_score),
+      dimensions: evaluation.dimensions,
+      summary: evaluation.summary,
+      top_priorities: evaluation.top_priorities,
+    });
 
     return new Response(JSON.stringify({ evaluation }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

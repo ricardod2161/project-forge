@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import type { Project } from "@/hooks/useProjects";
 
@@ -28,6 +29,29 @@ export interface ProjectVersion {
   created_at: string;
   updated_at: string;
 }
+
+export interface EvalDimension {
+  name: string;
+  score: number;
+  justification: string;
+  recommendations: string[];
+}
+
+export interface Evaluation {
+  id: string;
+  project_id: string;
+  user_id: string;
+  overall_score: number;
+  dimensions: EvalDimension[];
+  summary: string | null;
+  top_priorities: string[];
+  created_at: string;
+}
+
+// Tipo seguro para updates de projeto — sem campos imutáveis
+export type ProjectUpdatePayload = Partial<
+  Omit<Project, "id" | "user_id" | "created_at" | "updated_at">
+>;
 
 export function useProjectDetail(id: string | undefined) {
   return useQuery<Project>({
@@ -81,7 +105,7 @@ export function useUpdateProject(id: string | undefined) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (updates: Partial<Omit<Project, "metadata"> & { metadata?: Record<string, unknown> | null }>) => {
+    mutationFn: async (updates: ProjectUpdatePayload) => {
       const { data, error } = await supabase
         .from("projects")
         .update(updates as Record<string, unknown>)
@@ -123,13 +147,17 @@ export function useDeleteProject() {
   });
 }
 
+// Filtra explicitamente por user_id além do RLS
 export function useAllUserPrompts() {
+  const { user } = useAuth();
   return useQuery<(Prompt & { project_title?: string })[]>({
-    queryKey: ["all-prompts"],
+    queryKey: ["all-prompts", user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("prompts")
         .select("*, projects(title)")
+        .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map((p) => ({
@@ -140,13 +168,17 @@ export function useAllUserPrompts() {
   });
 }
 
+// Filtra versões via projetos do usuário
 export function useAllVersions() {
+  const { user } = useAuth();
   return useQuery<(ProjectVersion & { project_title?: string })[]>({
-    queryKey: ["all-versions"],
+    queryKey: ["all-versions", user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("project_versions")
-        .select("*, projects(title)")
+        .select("*, projects!inner(title, user_id)")
+        .eq("projects.user_id", user!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map((v) => ({
@@ -185,6 +217,47 @@ export function useTemplates() {
         .order("usage_count", { ascending: false });
       if (error) throw error;
       return data ?? [];
+    },
+  });
+}
+
+// Hook para buscar avaliação mais recente persistida de um projeto
+export function useProjectEvaluation(projectId: string | undefined) {
+  return useQuery<Evaluation | null>({
+    queryKey: ["evaluation", projectId],
+    enabled: !!projectId,
+    queryFn: async (): Promise<Evaluation | null> => {
+      // Cast necessário pois a tabela evaluations não está no types.ts gerado ainda
+      const { data, error } = await (supabase as unknown as {
+        from: (table: string) => {
+          select: (cols: string) => {
+            eq: (col: string, val: string) => {
+              order: (col: string, opts: { ascending: boolean }) => {
+                limit: (n: number) => {
+                  maybeSingle: () => Promise<{ data: Record<string, unknown> | null; error: unknown }>;
+                };
+              };
+            };
+          };
+        };
+      }).from("evaluations")
+        .select("*")
+        .eq("project_id", projectId!)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      return {
+        id: data.id as string,
+        project_id: data.project_id as string,
+        user_id: data.user_id as string,
+        overall_score: data.overall_score as number,
+        dimensions: (data.dimensions as unknown as EvalDimension[]) ?? [],
+        summary: data.summary as string | null,
+        top_priorities: (data.top_priorities as unknown as string[]) ?? [],
+        created_at: data.created_at as string,
+      };
     },
   });
 }

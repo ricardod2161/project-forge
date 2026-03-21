@@ -55,6 +55,47 @@ export type Database = {
           },
         ]
       }
+      evaluations: {
+        Row: {
+          created_at: string
+          dimensions: Json
+          id: string
+          overall_score: number
+          project_id: string
+          summary: string | null
+          top_priorities: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dimensions?: Json
+          id?: string
+          overall_score: number
+          project_id: string
+          summary?: string | null
+          top_priorities?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dimensions?: Json
+          id?: string
+          overall_score?: number
+          project_id?: string
+          summary?: string | null
+          top_priorities?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null

@@ -27,6 +27,8 @@ export interface Project {
   metadata: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+  // Contagem de prompts (incluída via join)
+  prompts_count?: number;
 }
 
 export interface CreateProjectInput {
@@ -62,6 +64,15 @@ function slugify(text: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
+}
+
+// Mapeia o resultado de projects com contagem de prompts
+function mapProjectWithCount(p: Record<string, unknown>): Project {
+  const promptsArr = p.prompts as Array<{ count: number }> | null;
+  const prompts_count = Array.isArray(promptsArr) && promptsArr.length > 0
+    ? Number(promptsArr[0].count)
+    : 0;
+  return { ...p, prompts_count } as Project;
 }
 
 // ─── Hooks ───────────────────────────────────────────────────────────────────
@@ -112,13 +123,13 @@ export function useRecentProjects(limit = 6) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("projects")
-        .select("*")
+        .select("*, prompts(count)")
         .eq("user_id", user!.id)
         .order("updated_at", { ascending: false })
         .limit(limit);
 
       if (error) throw error;
-      return (data ?? []) as Project[];
+      return (data ?? []).map(mapProjectWithCount);
     },
   });
 }
@@ -132,12 +143,12 @@ export function useProjects() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("projects")
-        .select("*")
+        .select("*, prompts(count)")
         .eq("user_id", user!.id)
         .order("updated_at", { ascending: false });
 
       if (error) throw error;
-      return (data ?? []) as Project[];
+      return (data ?? []).map(mapProjectWithCount);
     },
   });
 }
@@ -202,6 +213,63 @@ export function useToggleFavorite() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       queryClient.invalidateQueries({ queryKey: ["recent-projects"] });
+    },
+  });
+}
+
+export function useDuplicateProject() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      if (!user?.id) throw new Error("Usuário não autenticado");
+
+      // Buscar projeto original completo
+      const { data: original, error: fetchError } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (fetchError || !original) throw new Error("Projeto não encontrado");
+
+      const newTitle = `${original.title} (Cópia)`;
+
+      const { data, error } = await supabase
+        .from("projects")
+        .insert({
+          user_id: user.id,
+          title: newTitle,
+          slug: slugify(newTitle),
+          original_idea: original.original_idea,
+          description: original.description,
+          type: original.type,
+          niche: original.niche,
+          complexity: original.complexity,
+          platform: original.platform,
+          audience: original.audience,
+          features: original.features ?? [],
+          monetization: original.monetization,
+          integrations: original.integrations ?? [],
+          status: "draft",
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Project;
+    },
+    onSuccess: (project) => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-projects"] });
+      queryClient.invalidateQueries({ queryKey: ["project-metrics"] });
+      toast.success("Projeto duplicado com sucesso!");
+      navigate(`/app/projetos/${project.id}`);
+    },
+    onError: (error: Error) => {
+      toast.error(`Erro ao duplicar: ${error.message}`);
     },
   });
 }
