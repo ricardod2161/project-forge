@@ -1360,7 +1360,7 @@ const ProjectDetailPage = () => {
     <div className="space-y-6">
       <Skeleton className="h-28 w-full rounded-xl" />
       <div className="flex gap-1 flex-wrap">
-        {TABS.map(t => <Skeleton key={t.id} className="h-8 w-24 rounded-lg" />)}
+        {SYSTEM_TABS.map(t => <Skeleton key={t.id} className="h-8 w-24 rounded-lg" />)}
       </div>
       <Skeleton className="h-64 w-full rounded-xl" />
     </div>
