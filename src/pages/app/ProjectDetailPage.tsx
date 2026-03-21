@@ -16,6 +16,7 @@ import { useProjectDetail, useProjectPrompts, useProjectVersions, useUpdateProje
 import { useToggleFavorite, type Project } from "@/hooks/useProjects";
 import AIStreamingIndicator from "@/components/AIStreamingIndicator";
 import AIContentTab from "@/components/AIContentTab";
+import ScreensWithMockups from "@/components/ScreensWithMockups";
 import ScoreRing from "@/components/ScoreRing";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -843,7 +844,7 @@ const AIContentTabWrapper = ({
   onContentGenerated,
 }: {
   projectId: string;
-  contentType: "modules" | "screens" | "database" | "rules";
+  contentType: "modules" | "database" | "rules";
   icon: React.ElementType;
   title: string;
   description: string;
@@ -896,6 +897,63 @@ const AIContentTabWrapper = ({
       isLoading={isLoading}
       content={persistedContent}
       error={error}
+    />
+  );
+};
+
+// ── ScreensTabWrapper — aba de Telas com geração de mockups ───────────────────
+const ScreensTabWrapper = ({
+  projectId,
+  persistedContent,
+  onContentGenerated,
+}: {
+  projectId: string;
+  persistedContent: string | null;
+  onContentGenerated: (contentType: string, content: string) => void;
+}) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGenerate = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke("generate-ai-content", {
+        body: { project_id: projectId, content_type: "screens" },
+      });
+      if (invokeError) throw invokeError;
+      if (data?.error) {
+        if (data.error.includes("429") || data.error.includes("Limite")) {
+          setError("Limite de requisições atingido. Aguarde alguns minutos.");
+        } else if (data.error.includes("402") || data.error.includes("Créditos")) {
+          setError("Créditos insuficientes.");
+        } else {
+          setError(data.error);
+        }
+        return;
+      }
+      const generated = data?.content ?? "";
+      onContentGenerated("screens", generated);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao gerar conteúdo";
+      if (msg.includes("429") || msg.includes("rate")) {
+        setError("Limite de requisições atingido. Aguarde alguns minutos.");
+      } else {
+        setError("Erro ao gerar telas. Tente novamente.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <ScreensWithMockups
+      projectId={projectId}
+      persistedContent={persistedContent}
+      onContentGenerated={onContentGenerated}
+      isLoading={isLoading}
+      error={error}
+      onGenerate={handleGenerate}
     />
   );
 };
@@ -1186,7 +1244,7 @@ const ProjectDetailPage = () => {
           {activeTab === "prompts"   && <PromptsTab projectId={project.id} />}
           {activeTab === "versions"  && <VersionsTab projectId={project.id} />}
           {activeTab === "modules"   && <AIContentTabWrapper projectId={project.id} contentType="modules" icon={Puzzle} title="Módulos do Sistema" description="A IA decomporá o projeto em módulos bem definidos, com funcionalidades, dependências e complexidade de cada um." persistedContent={aiContentCache["modules"] ?? null} onContentGenerated={handleContentGenerated} />}
-          {activeTab === "screens"   && <AIContentTabWrapper projectId={project.id} contentType="screens" icon={Monitor} title="Mapa de Telas" description="A IA mapeará todas as telas, rotas, elementos de UI e fluxos de usuário do sistema." persistedContent={aiContentCache["screens"] ?? null} onContentGenerated={handleContentGenerated} />}
+          {activeTab === "screens"   && <ScreensTabWrapper projectId={project.id} persistedContent={aiContentCache["screens"] ?? null} onContentGenerated={handleContentGenerated} />}
           {activeTab === "database"  && <AIContentTabWrapper projectId={project.id} contentType="database" icon={Database} title="Esquema do Banco de Dados" description="A IA gerará o schema SQL completo com tabelas, relacionamentos, índices e RLS policies." persistedContent={aiContentCache["database"] ?? null} onContentGenerated={handleContentGenerated} />}
           {activeTab === "rules"     && <AIContentTabWrapper projectId={project.id} contentType="rules" icon={ScrollText} title="Regras de Negócio" description="A IA documentará todas as regras de negócio, validações e fluxos condicionais do sistema." persistedContent={aiContentCache["rules"] ?? null} onContentGenerated={handleContentGenerated} />}
           {activeTab === "exports"   && <InlineExportTab project={project} />}
