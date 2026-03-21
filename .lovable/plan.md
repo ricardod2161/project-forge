@@ -1,94 +1,93 @@
 
-## Two fixes + visual upgrade for website project detail
+## Aba "Páginas" com mockups visuais (como a aba Telas dos sistemas)
 
-### Root cause of the Prompts crash
+### Diagnóstico
 
-`PromptsTab` (line 289) has **no awareness of project mode**. Three hard-coded issues:
+A aba **"Telas"** dos sistemas (modo `system`) já tem a experiência completa:
+1. Gera documentação via IA (`generate-ai-content` com `content_type: "screens"`)
+2. Faz parse da documentação para extrair nomes de telas
+3. Renderiza cards de mockup para cada tela com botão "Gerar Mockup"
+4. Usa `ScreensWithMockups` + `ScreensTabWrapper` para tudo isso
 
-1. **Line 300** — `promptsByType` builds groups from `PROMPT_TYPES_LIST` (system types only). Website prompts (`site_master`, `site_copy`…) are saved in DB with those type values, but the grouped map has no key for them → they're silently dropped → `activePrompt` is always `undefined`.
-2. **Line 292** — `useState("master")` — initial selected type is always `"master"`, a system prompt type.
-3. **Line 310** — `currentTypeMeta = PROMPT_TYPES_LIST.find(...)!` — non-null assertion. For website mode the selected type could not exist in `PROMPT_TYPES_LIST` if somehow a website type gets selected → `currentTypeMeta` is `undefined` → accessing `.label`, `.desc`, `.platform` crashes the component with "The app encountered an error".
+A aba **"Páginas"** dos sites (modo `website`) hoje usa apenas `AIContentTabWrapper` → renderiza só markdown de texto, sem mockups visuais.
 
-### Missing website tab rendering
+### Solução
 
-Lines 1526–1532 never render `pages`, `copy`, `seo`, `structure` tabs — those tabs appear in the nav but clicking them shows a blank `motion.div`.
+Criar um `PagesTabWrapper` para sites, análogo ao `ScreensTabWrapper` dos sistemas, mas adaptado para sites:
 
-### TypeScript: `AIContentTabWrapper` contentType union too narrow
+**1. Reutilizar `ScreensWithMockups`** — o componente já é genérico o suficiente. Basta passar:
+- `content_type: "site_pages"` na geração de texto
+- `platform_type: "Web"` no `generate-screen-mockup`
+- Um parser de seções de site (baseado nos padrões do conteúdo `site_pages`)
 
-Line 1071: `contentType: "modules" | "database" | "rules"` — using it with website content types (`"site_pages"`, `"site_copy"`, `"site_seo"`, `"site_structure"`) would be a TS error.
+**2. Adaptar o parser de telas para sites** — o conteúdo gerado por `site_pages` usa cabeçalhos como:
+```
+## Página: Home / ## 1. Home / ## Seção: Hero / ## Página Principal
+```
+O `parseScreens` existente já cobre alguns padrões com `## Página: X`. Precisa garantir que também cubra `## 1. Home`, `## Seção: Hero`, etc.
 
----
-
-### Changes — only `src/pages/app/ProjectDetailPage.tsx`
-
-**1. Fix `PromptsTab` signature** — add `isWebsite: boolean` prop:
+**3. Criar `PagesTabWrapper`** em `ProjectDetailPage.tsx`, análogo ao `ScreensTabWrapper`:
 ```tsx
-const PromptsTab = ({ projectId, isWebsite }: { projectId: string; isWebsite: boolean }) => {
+const PagesTabWrapper = ({
+  projectId,
+  persistedContent,
+  onContentGenerated,
+  projectMetadata,
+  onUpdateMetadata,
+}: ...) => {
+  // Mesma lógica de ScreensTabWrapper mas com:
+  // - content_type: "site_pages"
+  // - titulo e descrição adaptados para sites
+  // - plataforma: "Web" (sempre desktop)
+};
 ```
 
-**2. Fix initial selected type** — derive from the prop:
+**4. Substituir no render** — linha 1540:
 ```tsx
-const [selectedType, setSelectedType] = useState(() => isWebsite ? "site_master" : "master");
+// Antes:
+{activeTab === "pages" && isWebsite && <AIContentTabWrapper ... contentType="site_pages" .../>}
+
+// Depois:
+{activeTab === "pages" && isWebsite && <PagesTabWrapper
+  projectId={project.id}
+  persistedContent={aiContentCache["site_pages"] ?? null}
+  onContentGenerated={handleContentGenerated}
+  projectMetadata={(project.metadata as Record<string, unknown>) ?? {}}
+  onUpdateMetadata={(patch) => updateProject.mutate({ metadata: patch as never, _silent: true } as never)}
+/>}
 ```
 
-**3. Fix `promptsByType` grouping** — use the correct list based on `isWebsite`:
+**5. Textos em português no `ScreensWithMockups`** — o componente já está em PT-BR exceto alguns detalhes. Verificar que os textos "Telas" → "Páginas" e "Tela" → "Seção" aparecem corretos. Para isso, vamos adicionar props opcionais:
 ```tsx
-const activeTypesList = isWebsite ? WEBSITE_PROMPT_TYPES_LIST : PROMPT_TYPES_LIST;
-
-const promptsByType = useMemo(() => {
-  const grouped: Record<string, ...> = {};
-  activeTypesList.forEach(t => { grouped[t.value] = []; });
-  (prompts ?? []).forEach(p => {
-    if (grouped[p.type]) grouped[p.type].push(p);
-    else if (!grouped[p.type] && p.type) grouped[p.type] = [p]; // safety
-  });
-  ...
-  return grouped;
-}, [prompts, activeTypesList]);
+interface ScreensWithMockupsProps {
+  // ...existing...
+  sectionLabel?: string;       // "tela" ou "seção/página"
+  emptyTitle?: string;         // override do título do empty state
+  emptyDescription?: string;   // override da descrição
+}
 ```
 
-**4. Fix `currentTypeMeta` lookup** — use `activeTypesList`:
-```tsx
-const currentTypeMeta = activeTypesList.find(t => t.value === selectedType) ?? activeTypesList[0];
+### Arquivo alterado
+
+Apenas **`src/pages/app/ProjectDetailPage.tsx`** — adicionar `PagesTabWrapper` (≈50 linhas) e substituir o render da aba `pages` na linha 1540.
+
+Opcionalmente, pequeno ajuste em `src/components/ScreensWithMockups.tsx` para aceitar `sectionLabel` prop e trocar "tela(s)" → "seção/seções" quando for modo site.
+
+### Resultado visual
+
+A aba "Páginas" ficará igual à aba "Telas" dos sistemas:
+```
+┌─────────────────────────────────────────────────────┐
+│ 🤖 Gerado por IA  [5 seções] [2/5 mockups]  [Copiar][Regenerar] │
+├─────────────────────────────────────────────────────┤
+│ Documentação das páginas (markdown)                  │
+├─────────────────────────────────────────────────────┤
+│ 🖼 Mockups Visuais                    [Gerar Todos (3)] │
+│ ┌──────────┐  ┌──────────┐  ┌──────────┐           │
+│ │  Hero    │  │  Sobre   │  │  Serv.   │           │
+│ │ [imagem] │  │ [Gerar]  │  │ [Gerar]  │           │
+│ └──────────┘  └──────────┘  └──────────┘           │
+└─────────────────────────────────────────────────────┘
 ```
 
-**5. Fix sub-tabs loop** — use `activeTypesList`:
-```tsx
-{activeTypesList.map(t => { ... })}
-```
-
-**6. Fix `AIContentTabWrapper` type** — widen the union:
-```tsx
-contentType: "modules" | "database" | "rules" | "site_pages" | "site_copy" | "site_seo" | "site_structure";
-```
-
-**7. Add missing tab rendering** — in the main AnimatePresence block, add website tab cases:
-```tsx
-{activeTab === "pages"     && isWebsite && <AIContentTabWrapper projectId={project.id} contentType="site_pages" ... />}
-{activeTab === "copy"      && isWebsite && <AIContentTabWrapper projectId={project.id} contentType="site_copy" ... />}
-{activeTab === "seo"       && isWebsite && <AIContentTabWrapper projectId={project.id} contentType="site_seo" ... />}
-{activeTab === "structure" && isWebsite && <AIContentTabWrapper projectId={project.id} contentType="site_structure" ... />}
-```
-
-**8. Pass `isWebsite` to `PromptsTab` at callsite** (line 1524):
-```tsx
-{activeTab === "prompts" && <PromptsTab projectId={project.id} isWebsite={isWebsite} />}
-```
-
-**9. Visual: website-mode badge in header** — add a "Site" globe badge alongside the existing niche/type badges (after line ~1414):
-```tsx
-{isWebsite && (
-  <span className="px-2.5 py-1 rounded-full text-2xs font-medium bg-accent/10 text-accent border border-accent/20 flex items-center gap-1.5">
-    <Globe className="w-2.5 h-2.5" />
-    Site
-  </span>
-)}
-```
-
-**10. Visual: website OverviewTab** — when `isWebsite`, render metadata fields from `projectMeta` (style, tone, sections, toggles). Add a `WebsiteOverviewTab` component below `OverviewTab` that displays:
-- Grid of metadata chips: Tipo de site, Estilo, Tom, Seções
-- Feature flags row: E-commerce / Blog / Formulário
-- Pass to render: `{activeTab === "overview" && isWebsite ? <WebsiteOverviewTab project={project} /> : activeTab === "overview" && <OverviewTab project={project} />}`
-
-### Files changed
-Only `src/pages/app/ProjectDetailPage.tsx` — surgical edits to lines 289–560, 1060–1126, 1522–1533.
+Cada card: imagem gerada pela IA do visual da seção/página, com lightbox, download e regenerar.
